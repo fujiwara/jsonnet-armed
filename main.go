@@ -46,7 +46,20 @@ func run(ctx context.Context, cli *CLI) error {
 	for k, v := range cli.ExtCode {
 		vm.ExtCode(k, v)
 	}
-	jsonStr, err := vm.EvaluateFile(cli.Filename)
+
+	var jsonStr string
+	var err error
+
+	if cli.Filename == "-" {
+		// Read from stdin
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("failed to read from stdin: %w", err)
+		}
+		jsonStr, err = vm.EvaluateAnonymousSnippet("stdin", string(input))
+	} else {
+		jsonStr, err = vm.EvaluateFile(cli.Filename)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to evaluate: %w", err)
 	}
