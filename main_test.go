@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -246,6 +247,112 @@ func TestRunWithCLIOutputToFile(t *testing.T) {
 
 			// Compare JSON output
 			compareJSON(t, string(output), tt.expected)
+		})
+	}
+}
+
+func TestRunWithCLIFromStdin(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		jsonnet     string
+		extStr      map[string]string
+		extCode     map[string]string
+		expected    string
+		expectError bool
+	}{
+		{
+			name: "basic stdin evaluation",
+			jsonnet: `{
+				foo: "bar",
+				baz: 123
+			}`,
+			expected: `{
+				"foo": "bar",
+				"baz": 123
+			}`,
+		},
+		{
+			name: "stdin with external string variables",
+			jsonnet: `{
+				env: std.extVar("env"),
+				region: std.extVar("region")
+			}`,
+			extStr: map[string]string{
+				"env":    "production",
+				"region": "us-west-2",
+			},
+			expected: `{
+				"env": "production",
+				"region": "us-west-2"
+			}`,
+		},
+		{
+			name: "stdin with external code variables",
+			jsonnet: `{
+				replicas: std.extVar("replicas"),
+				debug: std.extVar("debug")
+			}`,
+			extCode: map[string]string{
+				"replicas": "3",
+				"debug":    "true",
+			},
+			expected: `{
+				"replicas": 3,
+				"debug": true
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original stdin
+			originalStdin := os.Stdin
+			defer func() { os.Stdin = originalStdin }()
+
+			// Create pipe for stdin
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatalf("failed to create pipe: %v", err)
+			}
+			os.Stdin = r
+
+			// Write jsonnet content to pipe
+			go func() {
+				defer w.Close()
+				io.WriteString(w, tt.jsonnet)
+			}()
+
+			// Create CLI config with "-" as filename
+			cli := &armed.CLI{
+				Filename: "-",
+				ExtStr:   tt.extStr,
+				ExtCode:  tt.extCode,
+			}
+
+			// Capture output
+			var output bytes.Buffer
+			armed.SetOutput(&output)
+			defer armed.SetOutput(os.Stdout)
+
+			// Run evaluation
+			err = armed.RunWithCLI(ctx, cli)
+
+			// Check error expectation
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Compare JSON output
+			compareJSON(t, output.String(), tt.expected)
 		})
 	}
 }
