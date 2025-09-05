@@ -7,6 +7,7 @@ A Jsonnet rendering tool with additional useful functions.
 - Standard Jsonnet evaluation with external variables support
 - Built-in native functions for environment variable access
 - Hash functions for cryptographic operations
+- File functions for reading content and metadata
 
 ## Installation
 
@@ -93,6 +94,44 @@ local sha256_file = std.native("sha256_file");
 }
 ```
 
+### File Functions
+Access file content and metadata directly from Jsonnet.
+
+Available file functions:
+- `file_content(filename)`: Read file content as string
+- `file_stat(filename)`: Get file metadata as object
+
+```jsonnet
+local file_content = std.native("file_content");
+local file_stat = std.native("file_stat");
+
+{
+  // Read file content
+  config_content: file_content("/etc/config.json"),
+  readme: file_content("README.md"),
+  
+  // Parse JSON files directly
+  config: std.parseJson(file_content("/etc/config.json")),
+  
+  // Get file metadata
+  config_stat: file_stat("/etc/config.json"),
+  
+  // File information includes:
+  // - name: filename
+  // - size: file size in bytes
+  // - mode: file permissions as string
+  // - mod_time: modification time as Unix timestamp
+  // - is_dir: true if directory, false if regular file
+  
+  // Combine content and metadata
+  file_info: {
+    content: file_content("data.txt"),
+    stat: file_stat("data.txt"),
+    content_matches_size: std.length(file_content("data.txt")) == file_stat("data.txt").size
+  }
+}
+```
+
 ## Usage
 
 ```bash
@@ -133,6 +172,8 @@ local must_env = std.native("must_env");
 local md5 = std.native("md5");
 local sha256 = std.native("sha256");
 local sha256_file = std.native("sha256_file");
+local file_content = std.native("file_content");
+local file_stat = std.native("file_stat");
 
 {
   // External variables
@@ -152,6 +193,11 @@ local sha256_file = std.native("sha256_file");
   // File hash functions
   dockerfile_hash: sha256_file("Dockerfile"),
   config_file_integrity: sha256_file("/etc/app/config.yaml"),
+  
+  // File content and metadata
+  config: std.parseJson(file_content("/etc/app/config.json")),
+  config_modified: file_stat("/etc/app/config.json").mod_time,
+  is_large_config: file_stat("/etc/app/config.json").size > 1024,
 }
 ```
 

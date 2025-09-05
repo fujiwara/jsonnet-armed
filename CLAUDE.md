@@ -55,6 +55,7 @@ func compareJSON(t *testing.T, got, want string) {
 - Environment functions: `env(name, default)` and `must_env(name)`
 - Hash functions: `md5(data)`, `sha1(data)`, `sha256(data)`, `sha512(data)` return hash as hexadecimal string
 - File hash functions: `md5_file(filename)`, `sha1_file(filename)`, `sha256_file(filename)`, `sha512_file(filename)` return file content hash as hexadecimal string
+- File functions: `file_content(filename)` returns file content as string, `file_stat(filename)` returns file metadata object
 
 ## Development Commands
 

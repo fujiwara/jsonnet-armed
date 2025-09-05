@@ -39,6 +39,9 @@ func run(ctx context.Context, cli *CLI) error {
 	for _, f := range functions.HashFunctions {
 		vm.NativeFunction(f)
 	}
+	for _, f := range functions.FileFunctions {
+		vm.NativeFunction(f)
+	}
 
 	for k, v := range cli.ExtStr {
 		vm.ExtVar(k, v)
