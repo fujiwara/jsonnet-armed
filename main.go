@@ -32,14 +32,11 @@ func RunWithCLI(ctx context.Context, cli *CLI) error {
 func run(ctx context.Context, cli *CLI) error {
 	vm := jsonnet.MakeVM()
 
+	// Add importer for armed.libsonnet
+	vm.Importer(&ArmedImporter{})
+
 	// Register native functions
-	for _, f := range functions.EnvFunctions {
-		vm.NativeFunction(f)
-	}
-	for _, f := range functions.HashFunctions {
-		vm.NativeFunction(f)
-	}
-	for _, f := range functions.FileFunctions {
+	for _, f := range functions.AllFunctions() {
 		vm.NativeFunction(f)
 	}
 
@@ -59,4 +56,19 @@ func run(ctx context.Context, cli *CLI) error {
 	}
 	_, err = io.WriteString(output, jsonStr)
 	return err
+}
+
+// ArmedImporter provides virtual file system for armed.libsonnet
+type ArmedImporter struct{}
+
+func (ai *ArmedImporter) Import(importedFrom, importedPath string) (contents jsonnet.Contents, foundAt string, err error) {
+	if importedPath == "armed.libsonnet" {
+		// Generate the library content dynamically
+		content := functions.GenerateArmedLib()
+		return jsonnet.MakeContents(content), "armed.libsonnet", nil
+	}
+
+	// Fall back to default file system import
+	importer := &jsonnet.FileImporter{}
+	return importer.Import(importedFrom, importedPath)
 }

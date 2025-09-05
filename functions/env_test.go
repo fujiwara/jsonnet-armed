@@ -16,13 +16,8 @@ func TestEnvFunctions(t *testing.T) {
 	ctx := context.Background()
 
 	// Set test environment variables
-	os.Setenv("TEST_ENV_VAR", "test-value")
-	os.Setenv("TEST_NUMBER", "42")
-	defer func() {
-		os.Unsetenv("TEST_ENV_VAR")
-		os.Unsetenv("TEST_NUMBER")
-		os.Unsetenv("TEST_UNSET_VAR")
-	}()
+	t.Setenv("TEST_ENV_VAR", "test-value")
+	t.Setenv("TEST_NUMBER", "42")
 
 	tests := []struct {
 		name        string
@@ -197,8 +192,7 @@ func TestEnvFunctionsWithEmptyEnvVar(t *testing.T) {
 	ctx := context.Background()
 
 	// Set environment variable to empty string
-	os.Setenv("TEST_EMPTY_VAR", "")
-	defer os.Unsetenv("TEST_EMPTY_VAR")
+	t.Setenv("TEST_EMPTY_VAR", "")
 
 	tests := []struct {
 		name     string
