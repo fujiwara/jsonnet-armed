@@ -42,18 +42,18 @@ func hashFileFunction(name string, newHasher func() hash.Hash) *jsonnet.NativeFu
 			if !ok {
 				return nil, fmt.Errorf("%s: filename must be a string", name)
 			}
-			
+
 			file, err := os.Open(filename)
 			if err != nil {
 				return nil, fmt.Errorf("%s: failed to open file %s: %w", name, filename, err)
 			}
 			defer file.Close()
-			
+
 			hasher := newHasher()
 			if _, err := io.Copy(hasher, file); err != nil {
 				return nil, fmt.Errorf("%s: failed to read file %s: %w", name, filename, err)
 			}
-			
+
 			return hex.EncodeToString(hasher.Sum(nil)), nil
 		},
 	}
@@ -65,7 +65,7 @@ var HashFunctions = []*jsonnet.NativeFunction{
 	hashFunction("sha1", func() hash.Hash { return sha1.New() }),
 	hashFunction("sha256", func() hash.Hash { return sha256.New() }),
 	hashFunction("sha512", func() hash.Hash { return sha512.New() }),
-	
+
 	// File hash functions
 	hashFileFunction("md5_file", func() hash.Hash { return md5.New() }),
 	hashFileFunction("sha1_file", func() hash.Hash { return sha1.New() }),

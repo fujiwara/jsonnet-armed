@@ -16,34 +16,34 @@ func TestFileFunctions(t *testing.T) {
 
 	// Create test files with known content
 	tmpDir := t.TempDir()
-	
+
 	// Create test file with simple content
 	helloFile := filepath.Join(tmpDir, "hello.txt")
 	helloContent := "Hello, World!"
 	if err := os.WriteFile(helloFile, []byte(helloContent), 0644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	
+
 	// Create test file with JSON content
 	jsonFile := filepath.Join(tmpDir, "test.json")
 	jsonContent := `{"message": "test", "number": 42}`
 	if err := os.WriteFile(jsonFile, []byte(jsonContent), 0644); err != nil {
 		t.Fatalf("failed to create JSON test file: %v", err)
 	}
-	
+
 	// Create test file with UTF-8 content
 	utf8File := filepath.Join(tmpDir, "utf8.txt")
 	utf8Content := "こんにちは、世界！"
 	if err := os.WriteFile(utf8File, []byte(utf8Content), 0644); err != nil {
 		t.Fatalf("failed to create UTF-8 test file: %v", err)
 	}
-	
+
 	// Create empty file
 	emptyFile := filepath.Join(tmpDir, "empty.txt")
 	if err := os.WriteFile(emptyFile, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create empty test file: %v", err)
 	}
-	
+
 	// Create a directory for testing
 	testDir := filepath.Join(tmpDir, "testdir")
 	if err := os.Mkdir(testDir, 0755); err != nil {

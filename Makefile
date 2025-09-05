@@ -1,6 +1,6 @@
 .PHONY: clean test
 
-jsonnet-armed: go.* *.go
+jsonnet-armed: go.* *.go cmd/*/*.go functions/*.go
 	go build -o $@ ./cmd/jsonnet-armed
 
 clean:

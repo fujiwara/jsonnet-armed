@@ -214,19 +214,19 @@ func TestHashFileFunctions(t *testing.T) {
 
 	// Create test files with known content
 	tmpDir := t.TempDir()
-	
+
 	// Create test file with "hello" content
 	helloFile := filepath.Join(tmpDir, "hello.txt")
 	if err := os.WriteFile(helloFile, []byte("hello"), 0644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	
+
 	// Create test file with empty content
 	emptyFile := filepath.Join(tmpDir, "empty.txt")
 	if err := os.WriteFile(emptyFile, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create empty test file: %v", err)
 	}
-	
+
 	// Create test file with UTF-8 content
 	utf8File := filepath.Join(tmpDir, "utf8.txt")
 	if err := os.WriteFile(utf8File, []byte("こんにちは"), 0644); err != nil {

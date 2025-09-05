@@ -18,18 +18,18 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			if !ok {
 				return nil, fmt.Errorf("file_content: filename must be a string")
 			}
-			
+
 			file, err := os.Open(filename)
 			if err != nil {
 				return nil, fmt.Errorf("file_content: failed to open file %s: %w", filename, err)
 			}
 			defer file.Close()
-			
+
 			content, err := io.ReadAll(file)
 			if err != nil {
 				return nil, fmt.Errorf("file_content: failed to read file %s: %w", filename, err)
 			}
-			
+
 			return string(content), nil
 		},
 	},
@@ -41,12 +41,12 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			if !ok {
 				return nil, fmt.Errorf("file_stat: filename must be a string")
 			}
-			
+
 			stat, err := os.Stat(filename)
 			if err != nil {
 				return nil, fmt.Errorf("file_stat: failed to stat file %s: %w", filename, err)
 			}
-			
+
 			return map[string]any{
 				"name":     stat.Name(),
 				"size":     stat.Size(),
