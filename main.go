@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-jsonnet"
 )
 
@@ -30,11 +31,12 @@ func RunWithCLI(ctx context.Context, cli *CLI) error {
 
 func run(ctx context.Context, cli *CLI) error {
 	vm := jsonnet.MakeVM()
-	/*
-		for _, f := range cli.nativeFuncs {
-			vm.NativeFunction(f)
-		}
-	*/
+
+	// Register native functions
+	for _, f := range functions.EnvFunctions {
+		vm.NativeFunction(f)
+	}
+
 	for k, v := range cli.ExtStr {
 		vm.ExtVar(k, v)
 	}

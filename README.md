@@ -2,10 +2,46 @@
 
 A Jsonnet rendering tool with additional useful functions.
 
+## Features
+
+- Standard Jsonnet evaluation with external variables support
+- Built-in native functions for environment variable access
+
 ## Installation
 
 ```bash
 go install github.com/fujiwara/jsonnet-armed/cmd/jsonnet-armed@latest
+```
+
+## Native Functions
+
+jsonnet-armed provides built-in native functions that can be called using `std.native()`:
+
+### env(name, default)
+Get an environment variable with a default value.
+
+```jsonnet
+local env = std.native("env");
+
+{
+  // Returns the value of HOME environment variable, or "/tmp" if not set
+  home: env("HOME", "/tmp"),
+  
+  // Can use any JSON value as default
+  config: env("CONFIG", { debug: false })
+}
+```
+
+### must_env(name)
+Get an environment variable that must exist. Returns an error if the variable is not set.
+
+```jsonnet
+local must_env = std.native("must_env");
+
+{
+  // Will fail if DATABASE_URL is not set
+  database_url: must_env("DATABASE_URL")
+}
 ```
 
 ## Usage
@@ -41,13 +77,21 @@ jsonnet-armed -V env=production -V region=us-west-2 config.jsonnet
 jsonnet-armed --ext-code replicas=3 --ext-code debug=true deployment.jsonnet
 ```
 
-Example Jsonnet file using external variables:
+Example Jsonnet file using external variables and native functions:
 ```jsonnet
+local env = std.native("env");
+local must_env = std.native("must_env");
+
 {
+  // External variables
   environment: std.extVar("env"),
   region: std.extVar("region"),
   replicas: std.extVar("replicas"),
   debug: std.extVar("debug"),
+  
+  // Environment variables
+  home_dir: env("HOME", "/home/user"),
+  api_key: must_env("API_KEY"),
 }
 ```
 
