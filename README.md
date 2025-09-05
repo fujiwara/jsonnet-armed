@@ -17,7 +17,21 @@ go install github.com/fujiwara/jsonnet-armed/cmd/jsonnet-armed@latest
 
 ## Native Functions
 
-jsonnet-armed provides built-in native functions that can be called using `std.native()`:
+jsonnet-armed provides built-in native functions that can be called using `std.native()`.
+
+For convenience, you can import the `armed.libsonnet` library (dynamically generated, no separate file needed):
+
+```jsonnet
+local armed = import 'armed.libsonnet';
+
+{
+  sha256_test: armed.sha256('test'),
+  env_test: armed.env('USER', 'default_user'),
+  file_content: armed.file_content('config.json'),
+}
+```
+
+You can also use the traditional approach with `std.native()`:
 
 ### env(name, default)
 Get an environment variable with a default value.
