@@ -20,6 +20,50 @@ func TestHashFunctions(t *testing.T) {
 		expectError bool
 	}{
 		{
+			name: "md5 with simple string",
+			jsonnet: `
+			local md5 = std.native("md5");
+			{
+				hash: md5("hello")
+			}`,
+			expected: `{
+				"hash": "5d41402abc4b2a76b9719d911017c592"
+			}`,
+		},
+		{
+			name: "md5 with empty string",
+			jsonnet: `
+			local md5 = std.native("md5");
+			{
+				hash: md5("")
+			}`,
+			expected: `{
+				"hash": "d41d8cd98f00b204e9800998ecf8427e"
+			}`,
+		},
+		{
+			name: "sha1 with simple string",
+			jsonnet: `
+			local sha1 = std.native("sha1");
+			{
+				hash: sha1("hello")
+			}`,
+			expected: `{
+				"hash": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+			}`,
+		},
+		{
+			name: "sha1 with empty string",
+			jsonnet: `
+			local sha1 = std.native("sha1");
+			{
+				hash: sha1("")
+			}`,
+			expected: `{
+				"hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+			}`,
+		},
+		{
 			name: "sha256 with simple string",
 			jsonnet: `
 			local sha256 = std.native("sha256");
@@ -42,29 +86,65 @@ func TestHashFunctions(t *testing.T) {
 			}`,
 		},
 		{
-			name: "sha256 with multiple calls",
+			name: "sha512 with simple string",
 			jsonnet: `
-			local sha256 = std.native("sha256");
+			local sha512 = std.native("sha512");
 			{
-				hello: sha256("hello"),
-				world: sha256("world"),
-				hello_world: sha256("helloworld")
+				hash: sha512("hello")
 			}`,
 			expected: `{
-				"hello": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-				"world": "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7",
-				"hello_world": "936a185caaa266bb9cbe981e9e05cb78cd732b0b3280eb944412bb6f8f8f07af"
+				"hash": "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"
 			}`,
 		},
 		{
-			name: "sha256 with UTF-8 string",
+			name: "sha512 with empty string",
 			jsonnet: `
-			local sha256 = std.native("sha256");
+			local sha512 = std.native("sha512");
 			{
-				hash: sha256("こんにちは")
+				hash: sha512("")
 			}`,
 			expected: `{
-				"hash": "125aeadf27b0459b8760c13a3d80912dfa8a81a68261906f60d87f4a0268646c"
+				"hash": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+			}`,
+		},
+		{
+			name: "multiple hash functions with same input",
+			jsonnet: `
+			local md5 = std.native("md5");
+			local sha1 = std.native("sha1");
+			local sha256 = std.native("sha256");
+			local sha512 = std.native("sha512");
+			{
+				md5: md5("hello"),
+				sha1: sha1("hello"),
+				sha256: sha256("hello"),
+				sha512: sha512("hello")
+			}`,
+			expected: `{
+				"md5": "5d41402abc4b2a76b9719d911017c592",
+				"sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d",
+				"sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+				"sha512": "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"
+			}`,
+		},
+		{
+			name: "hash functions with UTF-8 string",
+			jsonnet: `
+			local md5 = std.native("md5");
+			local sha1 = std.native("sha1");
+			local sha256 = std.native("sha256");
+			local sha512 = std.native("sha512");
+			{
+				md5: md5("こんにちは"),
+				sha1: sha1("こんにちは"),
+				sha256: sha256("こんにちは"),
+				sha512: sha512("こんにちは")
+			}`,
+			expected: `{
+				"md5": "c0e89a293bd36c7a768e4e9d2c5475a8",
+				"sha1": "20427a708c3f6f07cf12ab23557982d9e6d23b61",
+				"sha256": "125aeadf27b0459b8760c13a3d80912dfa8a81a68261906f60d87f4a0268646c",
+				"sha512": "bb2b0b573e976d4240fd775e3b0d8c8fcbd058d832fe451214db9d604dc7b3817f0b1b030d27488c96fc0e008228172acdd5e15c26f6543d5f48dc75d8d9a662"
 			}`,
 		},
 		{

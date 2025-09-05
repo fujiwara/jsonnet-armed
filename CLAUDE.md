@@ -53,7 +53,7 @@ func compareJSON(t *testing.T, got, want string) {
 
 ### Native Functions
 - Environment functions: `env(name, default)` and `must_env(name)`
-- Hash functions: `sha256(data)` returns SHA256 hash as hexadecimal string
+- Hash functions: `md5(data)`, `sha1(data)`, `sha256(data)`, `sha512(data)` return hash as hexadecimal string
 
 ## Development Commands
 
