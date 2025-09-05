@@ -6,6 +6,7 @@ A Jsonnet rendering tool with additional useful functions.
 
 - Standard Jsonnet evaluation with external variables support
 - Built-in native functions for environment variable access
+- Hash functions for cryptographic operations
 
 ## Installation
 
@@ -41,6 +42,54 @@ local must_env = std.native("must_env");
 {
   // Will fail if DATABASE_URL is not set
   database_url: must_env("DATABASE_URL")
+}
+```
+
+### Hash Functions
+Calculate hash of the given string or file and return it as hexadecimal string.
+
+Available hash functions:
+
+**String Hash Functions:**
+- `md5(data)`: MD5 hash (32 characters)
+- `sha1(data)`: SHA-1 hash (40 characters)  
+- `sha256(data)`: SHA-256 hash (64 characters)
+- `sha512(data)`: SHA-512 hash (128 characters)
+
+**File Hash Functions:**
+- `md5_file(filename)`: MD5 hash of file content (32 characters)
+- `sha1_file(filename)`: SHA-1 hash of file content (40 characters)
+- `sha256_file(filename)`: SHA-256 hash of file content (64 characters)
+- `sha512_file(filename)`: SHA-512 hash of file content (128 characters)
+
+```jsonnet
+local md5 = std.native("md5");
+local sha1 = std.native("sha1");
+local sha256 = std.native("sha256");
+local sha512 = std.native("sha512");
+
+local md5_file = std.native("md5_file");
+local sha256_file = std.native("sha256_file");
+
+{
+  // String hash functions
+  md5_hash: md5("hello"),       // "5d41402abc4b2a76b9719d911017c592"
+  sha1_hash: sha1("hello"),     // "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+  sha256_hash: sha256("hello"), // "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+  sha512_hash: sha512("hello"), // 128 character hash
+  
+  // File hash functions
+  config_file_hash: sha256_file("/etc/config.json"),
+  self_hash: md5_file(std.thisFile),
+  
+  // Compare string vs file content
+  matches: sha256("hello") == sha256_file("/tmp/hello.txt"),
+  
+  // Can be used with variables
+  user_id: sha256(std.extVar("username")),
+  
+  // Combine with other functions
+  short_hash: std.substr(sha256("data"), 0, 8)
 }
 ```
 
@@ -81,6 +130,9 @@ Example Jsonnet file using external variables and native functions:
 ```jsonnet
 local env = std.native("env");
 local must_env = std.native("must_env");
+local md5 = std.native("md5");
+local sha256 = std.native("sha256");
+local sha256_file = std.native("sha256_file");
 
 {
   // External variables
@@ -92,6 +144,14 @@ local must_env = std.native("must_env");
   // Environment variables
   home_dir: env("HOME", "/home/user"),
   api_key: must_env("API_KEY"),
+  
+  // Hash functions
+  config_hash: sha256(std.extVar("env") + std.extVar("region")),
+  short_id: md5(std.extVar("instance_id"))[0:8],
+  
+  // File hash functions
+  dockerfile_hash: sha256_file("Dockerfile"),
+  config_file_integrity: sha256_file("/etc/app/config.yaml"),
 }
 ```
 
