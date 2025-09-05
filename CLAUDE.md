@@ -51,6 +51,10 @@ func compareJSON(t *testing.T, got, want string) {
 - String variables are passed as-is
 - Code variables are evaluated as Jsonnet expressions
 
+### Native Functions
+- Environment functions: `env(name, default)` and `must_env(name)`
+- Hash functions: `sha256(data)` returns SHA256 hash as hexadecimal string
+
 ## Development Commands
 
 ### Build
