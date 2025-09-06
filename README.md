@@ -8,6 +8,7 @@ A Jsonnet rendering tool with additional useful functions.
 - Built-in native functions for environment variable access
 - Hash functions for cryptographic operations
 - File functions for reading content and metadata
+- External command execution with timeout and cancellation
 
 ## Installation
 
@@ -28,6 +29,7 @@ local armed = import 'armed.libsonnet';
   sha256_test: armed.sha256('test'),
   env_test: armed.env('USER', 'default_user'),
   file_content: armed.file_content('config.json'),
+  command_result: armed.exec('echo', ['Hello, World!']),
 }
 ```
 
@@ -185,6 +187,90 @@ local sha256_file = std.native("sha256_file");
 }
 ```
 
+### External Command Execution
+
+Execute external commands and capture their output, with timeout and cancellation support.
+
+Available exec functions:
+- `exec(command, args)`: Execute command with arguments array
+- `exec_with_env(command, args, env_vars)`: Execute command with custom environment variables
+
+Both functions return an object with:
+- `stdout`: Standard output as string
+- `stderr`: Standard error as string  
+- `exit_code`: Exit code as number (0 = success)
+
+Commands are executed with a 30-second timeout by default (configurable via `functions.DefaultExecTimeout`). When the CLI timeout is reached, running commands are cancelled immediately.
+
+```jsonnet
+local exec = std.native("exec");
+local exec_with_env = std.native("exec_with_env");
+
+{
+  // Basic command execution
+  hello: exec("echo", ["Hello, World!"]),
+  // Result: {stdout: "Hello, World!\n", stderr: "", exit_code: 0}
+  
+  // Command with multiple arguments
+  ls_result: exec("ls", ["-la", "/tmp"]),
+  
+  // Check exit code for success
+  success: exec("true", []).exit_code == 0,   // true
+  failure: exec("false", []).exit_code == 0,  // false
+  
+  // Capture stderr
+  error_output: exec("sh", ["-c", "echo error >&2; exit 1"]),
+  // Result: {stdout: "", stderr: "error\n", exit_code: 1}
+  
+  // Command with environment variables
+  custom_env: exec_with_env("sh", ["-c", "echo $CUSTOM_VAR"], {
+    "CUSTOM_VAR": "Hello from env!"
+  }),
+  // Result: {stdout: "Hello from env!\n", stderr: "", exit_code: 0}
+  
+  // Git commands with clean environment
+  git_status: exec_with_env("git", ["status", "--porcelain"], {
+    "GIT_CONFIG_NOGLOBAL": "1",
+    "GIT_CONFIG_NOSYSTEM": "1"
+  }),
+  
+  // Conditional execution based on exit code
+  file_info: {
+    local test_result = exec("test", ["-f", "/etc/passwd"]),
+    file_exists: test_result.exit_code == 0,
+    content: if test_result.exit_code == 0 
+             then exec("head", ["-1", "/etc/passwd"]).stdout
+             else "File not found"
+  },
+  
+  // Safe command execution with error handling
+  safe_command: {
+    local result = exec("unknown-command", ["arg1"]),
+    success: result.exit_code == 0,
+    output: if result.exit_code == 0 then result.stdout else result.stderr,
+    error_msg: if result.exit_code != 0 then "Command failed: " + result.stderr else null
+  },
+  
+  // Working with JSON output
+  docker_info: {
+    local result = exec("docker", ["inspect", "container-name"]),
+    success: result.exit_code == 0,
+    data: if result.exit_code == 0 then std.parseJson(result.stdout) else null
+  }
+}
+```
+
+**Security Notes:**
+- Commands are executed directly (no shell interpretation)
+- Arguments are properly isolated to prevent command injection
+- Use environment variables via `exec_with_env` rather than shell expansion
+- Commands timeout after 30 seconds and are forcefully killed (SIGTERM then SIGKILL)
+
+**Timeout Behavior:**
+- Default timeout: 30 seconds (configurable via `functions.DefaultExecTimeout`)
+- If CLI has `--timeout` flag, exec commands are cancelled when CLI times out
+- Process termination: SIGTERM → 5 second grace period → SIGKILL
+
 ### File Functions
 Access file content and metadata directly from Jsonnet.
 
@@ -286,6 +372,8 @@ local sha256 = std.native("sha256");
 local sha256_file = std.native("sha256_file");
 local file_content = std.native("file_content");
 local file_stat = std.native("file_stat");
+local exec = std.native("exec");
+local exec_with_env = std.native("exec_with_env");
 
 {
   // External variables
@@ -310,6 +398,22 @@ local file_stat = std.native("file_stat");
   config: std.parseJson(file_content("/etc/app/config.json")),
   config_modified: file_stat("/etc/app/config.json").mod_time,
   is_large_config: file_stat("/etc/app/config.json").size > 1024,
+  
+  // Command execution
+  git_commit: exec("git", ["rev-parse", "HEAD"]).stdout[0:7],
+  build_info: {
+    local result = exec("date", ["+%Y-%m-%d %H:%M:%S"]),
+    timestamp: if result.exit_code == 0 then std.strReplace(result.stdout, "\n", "") else "unknown",
+    success: result.exit_code == 0
+  },
+  
+  // System information
+  system_info: {
+    local uname = exec("uname", ["-a"]),
+    local uptime = exec("uptime", []),
+    platform: if uname.exit_code == 0 then std.strReplace(uname.stdout, "\n", "") else "unknown",
+    uptime: if uptime.exit_code == 0 then std.strReplace(uptime.stdout, "\n", "") else "unknown"
+  }
 }
 ```
 
