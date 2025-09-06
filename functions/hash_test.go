@@ -1,15 +1,16 @@
-package functions
+package functions_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestMD5Function(t *testing.T) {
-	md5Func := HashFunctions[0].Func // md5 function
+	md5Func := functions.HashFunctions[0].Func // md5 function
 
 	tests := []struct {
 		name        string
@@ -57,7 +58,7 @@ func TestMD5Function(t *testing.T) {
 }
 
 func TestSHA256Function(t *testing.T) {
-	sha256Func := HashFunctions[2].Func // sha256 function
+	sha256Func := functions.HashFunctions[2].Func // sha256 function
 
 	tests := []struct {
 		name        string
@@ -93,7 +94,7 @@ func TestSHA256Function(t *testing.T) {
 }
 
 func TestMD5FileFunction(t *testing.T) {
-	md5FileFunc := HashFunctions[4].Func // md5_file function
+	md5FileFunc := functions.HashFunctions[4].Func // md5_file function
 
 	// Create test file
 	tmpDir := t.TempDir()

@@ -1,15 +1,16 @@
-package functions
+package functions_test
 
 import (
 	"math"
 	"testing"
 	"time"
 
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestNowFunction(t *testing.T) {
-	nowFunc := TimeFunctions[0].Func // now function
+	nowFunc := functions.TimeFunctions[0].Func // now function
 
 	// Call the function
 	result, err := nowFunc([]any{})
@@ -31,7 +32,7 @@ func TestNowFunction(t *testing.T) {
 }
 
 func TestTimeFormatFunction(t *testing.T) {
-	timeFormatFunc := TimeFunctions[1].Func // time_format function
+	timeFormatFunc := functions.TimeFunctions[1].Func // time_format function
 
 	// Fixed timestamp for consistent testing
 	// 2024-01-15 10:30:45 UTC
@@ -108,7 +109,7 @@ func TestTimeFormatFunction(t *testing.T) {
 }
 
 func TestTimeFormatWithNanoseconds(t *testing.T) {
-	timeFormatFunc := TimeFunctions[1].Func // time_format function
+	timeFormatFunc := functions.TimeFunctions[1].Func // time_format function
 
 	// Timestamp with fractional seconds (nanosecond precision)
 	timestamp := 1705314645.123456789
@@ -122,29 +123,5 @@ func TestTimeFormatWithNanoseconds(t *testing.T) {
 	expected := "2024-01-15T10:30:45.123456716Z"
 	if diff := cmp.Diff(expected, result); diff != "" {
 		t.Errorf("result mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func TestGetTimeFormat(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"RFC3339", "2006-01-02T15:04:05Z07:00"},
-		{"RFC3339Nano", "2006-01-02T15:04:05.999999999Z07:00"},
-		{"DateTime", "2006-01-02 15:04:05"},
-		{"DateOnly", "2006-01-02"},
-		{"TimeOnly", "15:04:05"},
-		{"custom-format", "custom-format"}, // Unknown format should be returned as-is
-		{"2006-01-02", "2006-01-02"},       // Custom format should be returned as-is
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := getTimeFormat(tt.input)
-			if diff := cmp.Diff(tt.expected, result); diff != "" {
-				t.Errorf("result mismatch (-want +got):\n%s", diff)
-			}
-		})
 	}
 }

@@ -1,15 +1,16 @@
-package functions
+package functions_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestFileContentFunction(t *testing.T) {
-	fileContentFunc := FileFunctions[0].Func // file_content function
+	fileContentFunc := functions.FileFunctions[0].Func // file_content function
 
 	// Create test file
 	tmpDir := t.TempDir()
@@ -65,7 +66,7 @@ func TestFileContentFunction(t *testing.T) {
 }
 
 func TestFileStatFunction(t *testing.T) {
-	fileStatFunc := FileFunctions[1].Func // file_stat function
+	fileStatFunc := functions.FileFunctions[1].Func // file_stat function
 
 	// Create test file
 	tmpDir := t.TempDir()
@@ -139,7 +140,7 @@ func TestFileStatFunction(t *testing.T) {
 }
 
 func TestFileExistsFunction(t *testing.T) {
-	fileExistsFunc := FileFunctions[2].Func // file_exists function
+	fileExistsFunc := functions.FileFunctions[2].Func // file_exists function
 
 	// Create test file
 	tmpDir := t.TempDir()

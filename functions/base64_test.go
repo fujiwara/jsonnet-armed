@@ -1,13 +1,14 @@
-package functions
+package functions_test
 
 import (
 	"testing"
 
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestBase64Function(t *testing.T) {
-	base64Func := Base64Functions[0].Func // base64 function
+	base64Func := functions.Base64Functions[0].Func // base64 function
 
 	tests := []struct {
 		name        string
@@ -65,7 +66,7 @@ func TestBase64Function(t *testing.T) {
 }
 
 func TestBase64URLFunction(t *testing.T) {
-	base64urlFunc := Base64Functions[1].Func // base64url function
+	base64urlFunc := functions.Base64Functions[1].Func // base64url function
 
 	tests := []struct {
 		name        string
