@@ -8,21 +8,22 @@ import (
 	"github.com/google/go-jsonnet/ast"
 )
 
+// timeFormats maps format constant names to their actual format strings
+var timeFormats = map[string]string{
+	// Common time format constants
+	"RFC3339":     time.RFC3339,     // "2006-01-02T15:04:05Z07:00"
+	"RFC3339Nano": time.RFC3339Nano, // "2006-01-02T15:04:05.999999999Z07:00"
+	"RFC1123":     time.RFC1123,     // "Mon, 02 Jan 2006 15:04:05 MST"
+	"RFC1123Z":    time.RFC1123Z,    // "Mon, 02 Jan 2006 15:04:05 -0700"
+	"DateTime":    time.DateTime,    // "2006-01-02 15:04:05"
+	"DateOnly":    time.DateOnly,    // "2006-01-02"
+	"TimeOnly":    time.TimeOnly,    // "15:04:05"
+}
+
 // getTimeFormat returns the actual time format string.
 // If format matches a Go time constant name, it returns the corresponding format.
 // Otherwise, it returns the format as-is.
 func getTimeFormat(format string) string {
-	timeFormats := map[string]string{
-		// Common time format constants
-		"RFC3339":     time.RFC3339,     // "2006-01-02T15:04:05Z07:00"
-		"RFC3339Nano": time.RFC3339Nano, // "2006-01-02T15:04:05.999999999Z07:00"
-		"RFC1123":     time.RFC1123,     // "Mon, 02 Jan 2006 15:04:05 MST"
-		"RFC1123Z":    time.RFC1123Z,    // "Mon, 02 Jan 2006 15:04:05 -0700"
-		"DateTime":    time.DateTime,    // "2006-01-02 15:04:05"
-		"DateOnly":    time.DateOnly,    // "2006-01-02"
-		"TimeOnly":    time.TimeOnly,    // "15:04:05"
-	}
-
 	if actualFormat, exists := timeFormats[format]; exists {
 		return actualFormat
 	}
