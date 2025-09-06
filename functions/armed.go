@@ -26,6 +26,9 @@ func AllFunctions() []*jsonnet.NativeFunction {
 	for _, f := range TimeFunctions {
 		all = append(all, f)
 	}
+	for _, f := range ExecFunctions {
+		all = append(all, f)
+	}
 
 	return all
 }

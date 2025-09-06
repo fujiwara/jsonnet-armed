@@ -46,6 +46,11 @@ func (cli *CLI) run(ctx context.Context) error {
 		defer cancel()
 	}
 
+	// Set the context for exec functions so they can be cancelled when CLI times out
+	functions.SetExecContext(ctx)
+	// Ensure context is reset when CLI execution completes
+	defer functions.ResetExecContext()
+
 	// Create a channel to signal completion
 	resultCh := make(chan result, 1)
 
