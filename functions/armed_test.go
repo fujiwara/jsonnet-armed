@@ -16,6 +16,8 @@ func TestGenerateArmedLib(t *testing.T) {
 		"must_env: std.native('must_env')",
 		"md5: std.native('md5')",
 		"file_stat: std.native('file_stat')",
+		"base64: std.native('base64')",
+		"base64url: std.native('base64url')",
 	}
 
 	for _, expected := range expectedFunctions {

@@ -60,6 +60,36 @@ local must_env = std.native("must_env");
 }
 ```
 
+### Base64 Functions
+Encode strings to Base64 format.
+
+Available base64 functions:
+- `base64(data)`: Standard Base64 encoding
+- `base64url(data)`: URL-safe Base64 encoding (uses `-` and `_` instead of `+` and `/`)
+
+```jsonnet
+local base64 = std.native("base64");
+local base64url = std.native("base64url");
+
+{
+  // Standard Base64 encoding
+  encoded: base64("Hello, World!"),        // "SGVsbG8sIFdvcmxkIQ=="
+  empty: base64(""),                       // ""
+  
+  // URL-safe Base64 encoding  
+  url_safe: base64url("??>>"),             // "Pz8-Pg==" (uses - instead of +)
+  
+  // Encoding JSON data
+  json_encoded: base64(std.manifestJsonEx({ 
+    user: "admin", 
+    timestamp: 1234567890 
+  }, "")),
+  
+  // Encoding with special characters
+  unicode: base64("こんにちは世界"),        // "44GT44KT44Gr44Gh44Gv5LiW55WM"
+}
+```
+
 ### Hash Functions
 Calculate hash of the given string or file and return it as hexadecimal string.
 
