@@ -3,7 +3,9 @@ package functions_test
 import (
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -218,6 +220,15 @@ func TestExecTimeout(t *testing.T) {
 		t.Skip("skipping timeout test in short mode")
 	}
 
+	// Save original timeout and restore after test
+	originalTimeout := functions.DefaultExecTimeout
+	defer func() {
+		functions.DefaultExecTimeout = originalTimeout
+	}()
+
+	// Set shorter timeout for testing
+	functions.DefaultExecTimeout = 3 * time.Second
+
 	execFunc, err := getExecFunction("exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
@@ -227,15 +238,15 @@ func TestExecTimeout(t *testing.T) {
 	var sleepArg string
 	if runtime.GOOS == "windows" {
 		sleepCmd = "timeout"
-		sleepArg = "35"
+		sleepArg = "5"
 	} else {
 		sleepCmd = "sleep"
-		sleepArg = "35"
+		sleepArg = "5"
 	}
 
 	t.Logf("Running command: %s %s", sleepCmd, sleepArg)
 
-	// This should timeout (30 seconds is the default timeout, we sleep for 35 seconds)
+	// This should timeout (3 seconds is the test timeout, we sleep for 5 seconds)
 	result, err := execFunc([]any{sleepCmd, []any{sleepArg}})
 	
 	t.Logf("Result: %v", result)
@@ -254,13 +265,22 @@ func TestExecTimeoutSIGKILL(t *testing.T) {
 		t.Skip("skipping SIGKILL test on Windows")
 	}
 
+	// Save original timeout and restore after test
+	originalTimeout := functions.DefaultExecTimeout
+	defer func() {
+		functions.DefaultExecTimeout = originalTimeout
+	}()
+
+	// Set shorter timeout for testing
+	functions.DefaultExecTimeout = 3 * time.Second
+
 	execFunc, err := getExecFunction("exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}
 
 	// This shell script ignores SIGTERM but will be killed by SIGKILL
-	script := `trap '' TERM; sleep 35`
+	script := `trap '' TERM; sleep 5`
 	
 	t.Logf("Running script that ignores SIGTERM")
 

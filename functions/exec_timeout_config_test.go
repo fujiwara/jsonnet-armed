@@ -30,7 +30,7 @@ func TestCustomExecTimeout(t *testing.T) {
 	start := time.Now()
 
 	// This should timeout in ~2 seconds due to custom DefaultExecTimeout
-	result, err := execFunc([]any{"sleep", []any{"5"}})
+	result, err := execFunc([]any{"sleep", []any{"3"}})
 
 	elapsed := time.Since(start)
 

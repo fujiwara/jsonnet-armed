@@ -28,7 +28,7 @@ func TestExecContextCancellation(t *testing.T) {
 	resultCh := make(chan execResult, 1)
 	
 	go func() {
-		result, err := execFunc([]any{"sleep", []any{"30"}})
+		result, err := execFunc([]any{"sleep", []any{"10"}})
 		resultCh <- execResult{result: result, err: err}
 	}()
 
@@ -72,8 +72,8 @@ func TestExecContextTimeout(t *testing.T) {
 
 	start := time.Now()
 	
-	// This should be cancelled by the parent context timeout (3s) before exec timeout (30s)
-	result, err := execFunc([]any{"sleep", []any{"30"}})
+	// This should be cancelled by the parent context timeout (3s) before exec timeout (10s)
+	result, err := execFunc([]any{"sleep", []any{"10"}})
 	
 	elapsed := time.Since(start)
 	
