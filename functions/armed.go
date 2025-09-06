@@ -9,11 +9,24 @@ import (
 // AllFunctions returns all native functions in one slice
 func AllFunctions() []*jsonnet.NativeFunction {
 	var all []*jsonnet.NativeFunction
-	all = append(all, EnvFunctions...)
-	all = append(all, HashFunctions...)
-	all = append(all, FileFunctions...)
-	all = append(all, Base64Functions...)
-	all = append(all, TimeFunctions...)
+
+	// Add functions from maps
+	for _, f := range EnvFunctions {
+		all = append(all, f)
+	}
+	for _, f := range HashFunctions {
+		all = append(all, f)
+	}
+	for _, f := range FileFunctions {
+		all = append(all, f)
+	}
+	for _, f := range Base64Functions {
+		all = append(all, f)
+	}
+	for _, f := range TimeFunctions {
+		all = append(all, f)
+	}
+
 	return all
 }
 

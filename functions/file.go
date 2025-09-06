@@ -9,9 +9,8 @@ import (
 	"github.com/google/go-jsonnet/ast"
 )
 
-var FileFunctions = []*jsonnet.NativeFunction{
-	{
-		Name:   "file_content",
+var FileFunctions = map[string]*jsonnet.NativeFunction{
+	"file_content": {
 		Params: []ast.Identifier{"filename"},
 		Func: func(args []any) (any, error) {
 			filename, ok := args[0].(string)
@@ -33,8 +32,7 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			return string(content), nil
 		},
 	},
-	{
-		Name:   "file_stat",
+	"file_stat": {
 		Params: []ast.Identifier{"filename"},
 		Func: func(args []any) (any, error) {
 			filename, ok := args[0].(string)
@@ -56,8 +54,7 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			}, nil
 		},
 	},
-	{
-		Name:   "file_exists",
+	"file_exists": {
 		Params: []ast.Identifier{"filename"},
 		Func: func(args []any) (any, error) {
 			filename, ok := args[0].(string)
@@ -69,4 +66,8 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			return err == nil, nil
 		},
 	},
+}
+
+func init() {
+	initializeFunctionMap(FileFunctions)
 }
