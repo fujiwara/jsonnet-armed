@@ -137,7 +137,7 @@ func TestBase64Functions(t *testing.T) {
 			}
 			// Run evaluation
 			cli.SetWriter(&output)
-			err := armed.RunWithCLI(ctx, cli)
+			err := cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {

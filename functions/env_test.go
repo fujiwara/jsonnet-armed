@@ -164,7 +164,7 @@ func TestEnvFunctions(t *testing.T) {
 			}
 			// Run evaluation
 			cli.SetWriter(&output)
-			err := armed.RunWithCLI(ctx, cli)
+			err := cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {
@@ -233,7 +233,7 @@ func TestEnvFunctionsWithEmptyEnvVar(t *testing.T) {
 			}
 			cli.SetWriter(&output)
 
-			if err := armed.RunWithCLI(ctx, cli); err != nil {
+			if err := cli.Run(ctx); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 

@@ -26,19 +26,19 @@ func (cli *CLI) SetWriter(w io.Writer) {
 func Run(ctx context.Context) error {
 	cli := &CLI{writer: os.Stdout}
 	kong.Parse(cli, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
-	return run(ctx, cli)
+	return cli.run(ctx)
 }
 
-// RunWithCLI runs the jsonnet evaluation with the given CLI configuration
-func RunWithCLI(ctx context.Context, cli *CLI) error {
+// Run runs the jsonnet evaluation with the CLI configuration
+func (cli *CLI) Run(ctx context.Context) error {
 	// Set default writer if not specified
 	if cli.writer == nil {
 		cli.writer = os.Stdout
 	}
-	return run(ctx, cli)
+	return cli.run(ctx)
 }
 
-func run(ctx context.Context, cli *CLI) error {
+func (cli *CLI) run(ctx context.Context) error {
 	// Apply timeout if specified
 	if cli.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -51,14 +51,14 @@ func run(ctx context.Context, cli *CLI) error {
 
 	// Run evaluation and output in goroutine to enable timeout
 	go func() {
-		jsonStr, err := evaluate(cli)
+		jsonStr, err := cli.evaluate()
 		if err != nil {
 			resultCh <- result{jsonStr: "", err: err}
 			return
 		}
 
 		// Write output within the timeout scope
-		err = writeOutput(cli, jsonStr)
+		err = cli.writeOutput(jsonStr)
 		resultCh <- result{jsonStr: jsonStr, err: err}
 	}()
 
@@ -80,7 +80,7 @@ type result struct {
 	err     error
 }
 
-func evaluate(cli *CLI) (string, error) {
+func (cli *CLI) evaluate() (string, error) {
 	vm := jsonnet.MakeVM()
 
 	// Add importer for armed.libsonnet
@@ -118,7 +118,7 @@ func evaluate(cli *CLI) (string, error) {
 	return jsonStr, nil
 }
 
-func writeOutput(cli *CLI, jsonStr string) error {
+func (cli *CLI) writeOutput(jsonStr string) error {
 	if cli.OutputFile != "" {
 		return os.WriteFile(cli.OutputFile, []byte(jsonStr), 0644)
 	}

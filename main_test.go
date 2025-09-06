@@ -177,7 +177,7 @@ func TestRunWithCLI(t *testing.T) {
 			cli.SetWriter(&output)
 
 			// Run evaluation
-			err := armed.RunWithCLI(ctx, cli)
+			err := cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {
@@ -247,7 +247,7 @@ func TestRunWithCLIOutputToFile(t *testing.T) {
 			}
 
 			// Run evaluation
-			if err := armed.RunWithCLI(ctx, cli); err != nil {
+			if err := cli.Run(ctx); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -348,7 +348,7 @@ func TestRunWithCLIFromStdin(t *testing.T) {
 			cli.SetWriter(&output)
 
 			// Run evaluation
-			err = armed.RunWithCLI(ctx, cli)
+			err = cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {
@@ -456,7 +456,7 @@ func TestRunWithCLITimeout(t *testing.T) {
 			cli.SetWriter(&output)
 
 			// Run evaluation
-			err := armed.RunWithCLI(ctx, cli)
+			err := cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {
@@ -549,7 +549,7 @@ func TestRunWithCLITimeoutFromStdin(t *testing.T) {
 			}()
 
 			// Run evaluation
-			err = armed.RunWithCLI(ctx, cli)
+			err = cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {
@@ -634,7 +634,7 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 			cli.SetWriter(output)
 
 			// Run evaluation
-			err := armed.RunWithCLI(ctx, cli)
+			err := cli.Run(ctx)
 
 			// Check error expectation
 			if tt.expectError {

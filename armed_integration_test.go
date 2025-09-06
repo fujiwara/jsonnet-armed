@@ -41,7 +41,7 @@ local armed = import 'armed.libsonnet';
 	cli.SetWriter(&output)
 
 	// Run jsonnet evaluation
-	err = RunWithCLI(context.Background(), cli)
+	err = cli.Run(context.Background())
 	if err != nil {
 		t.Fatalf("RunWithCLI failed: %v", err)
 	}
