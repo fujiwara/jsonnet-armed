@@ -33,17 +33,15 @@ local armed = import 'armed.libsonnet';
 	}
 	defer os.Remove(tmpfile)
 
-	// Set up CLI and capture output
+	// Set up CLI with output capture
 	var output bytes.Buffer
-	SetOutput(&output)
-	defer SetOutput(os.Stdout) // Reset to default
-
 	cli := &CLI{
 		Filename: tmpfile,
 	}
+	cli.SetWriter(&output)
 
 	// Run jsonnet evaluation
-	err = RunWithCLI(context.Background(), cli)
+	err = cli.Run(context.Background())
 	if err != nil {
 		t.Fatalf("RunWithCLI failed: %v", err)
 	}

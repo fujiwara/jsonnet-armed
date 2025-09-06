@@ -11,25 +11,76 @@ import (
 	"github.com/google/go-jsonnet"
 )
 
-var output io.Writer = os.Stdout
-
-// SetOutput sets the output destination for jsonnet evaluation results
+// SetOutput sets the output destination for jsonnet evaluation results (deprecated)
+// Use CLI.Writer field instead for thread-safe operation
 func SetOutput(w io.Writer) {
-	output = w
+	// This function is kept for backward compatibility but should not be used
+	// in concurrent tests as it modifies global state
+}
+
+// SetWriter sets the writer for CLI
+func (cli *CLI) SetWriter(w io.Writer) {
+	cli.writer = w
 }
 
 func Run(ctx context.Context) error {
-	cli := &CLI{}
+	cli := &CLI{writer: os.Stdout}
 	kong.Parse(cli, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
-	return run(ctx, cli)
+	return cli.run(ctx)
 }
 
-// RunWithCLI runs the jsonnet evaluation with the given CLI configuration
-func RunWithCLI(ctx context.Context, cli *CLI) error {
-	return run(ctx, cli)
+// Run runs the jsonnet evaluation with the CLI configuration
+func (cli *CLI) Run(ctx context.Context) error {
+	// Set default writer if not specified
+	if cli.writer == nil {
+		cli.writer = os.Stdout
+	}
+	return cli.run(ctx)
 }
 
-func run(ctx context.Context, cli *CLI) error {
+func (cli *CLI) run(ctx context.Context) error {
+	// Apply timeout if specified
+	if cli.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cli.Timeout)
+		defer cancel()
+	}
+
+	// Create a channel to signal completion
+	resultCh := make(chan result, 1)
+
+	// Run evaluation and output in goroutine to enable timeout
+	go func() {
+		jsonStr, err := cli.evaluate()
+		if err != nil {
+			resultCh <- result{jsonStr: "", err: err}
+			return
+		}
+
+		// Write output within the timeout scope
+		err = cli.writeOutput(jsonStr)
+		resultCh <- result{jsonStr: jsonStr, err: err}
+	}()
+
+	// Wait for either completion or timeout
+	select {
+	case res := <-resultCh:
+		return res.err
+
+	case <-ctx.Done():
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("evaluation timed out after %v", cli.Timeout)
+		}
+		return ctx.Err()
+	}
+}
+
+type result struct {
+	jsonStr string
+	err     error
+}
+
+func (cli *CLI) evaluate() (string, error) {
 	vm := jsonnet.MakeVM()
 
 	// Add importer for armed.libsonnet
@@ -54,20 +105,24 @@ func run(ctx context.Context, cli *CLI) error {
 		// Read from stdin
 		input, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			return fmt.Errorf("failed to read from stdin: %w", err)
+			return "", fmt.Errorf("failed to read from stdin: %w", err)
 		}
 		jsonStr, err = vm.EvaluateAnonymousSnippet("stdin", string(input))
 	} else {
 		jsonStr, err = vm.EvaluateFile(cli.Filename)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to evaluate: %w", err)
+		return "", fmt.Errorf("failed to evaluate: %w", err)
 	}
 
+	return jsonStr, nil
+}
+
+func (cli *CLI) writeOutput(jsonStr string) error {
 	if cli.OutputFile != "" {
 		return os.WriteFile(cli.OutputFile, []byte(jsonStr), 0644)
 	}
-	_, err = io.WriteString(output, jsonStr)
+	_, err := io.WriteString(cli.writer, jsonStr)
 	return err
 }
 
