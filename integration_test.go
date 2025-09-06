@@ -191,6 +191,78 @@ func TestIntegrationExamples(t *testing.T) {
 				"short_id":    "c65b83a2",
 			},
 		},
+		{
+			name: "README exec functions example",
+			jsonnet: `
+			local exec = std.native("exec");
+			local exec_with_env = std.native("exec_with_env");
+			{
+				// Basic command execution
+				hello: exec("echo", ["Hello, World!"]),
+				
+				// Check exit code for success
+				success: exec("true", []).exit_code == 0,
+				failure: exec("false", []).exit_code == 0,
+				
+				// Command with environment variables
+				custom_env: exec_with_env("sh", ["-c", "echo $TEST_VAR"], {
+					"TEST_VAR": "test-value"
+				}),
+				
+				// Safe command execution
+				date_result: {
+					local result = exec("date", ["+%Y"]),
+					success: result.exit_code == 0,
+					year_length: if result.exit_code == 0 then std.length(std.strReplace(result.stdout, "\n", "")) else 0
+				}
+			}`,
+			expected: map[string]interface{}{
+				"hello": map[string]interface{}{
+					"stdout":    "Hello, World!\n",
+					"stderr":    "",
+					"exit_code": float64(0),
+				},
+				"success": true,
+				"failure": false,
+				"custom_env": map[string]interface{}{
+					"stdout":    "test-value\n",
+					"stderr":    "",
+					"exit_code": float64(0),
+				},
+				"date_result": map[string]interface{}{
+					"success":     true,
+					"year_length": float64(4), // YYYY format should be 4 characters
+				},
+			},
+		},
+		{
+			name: "README armed.libsonnet with exec example",
+			jsonnet: `
+			local armed = import 'armed.libsonnet';
+			{
+				sha256_test: armed.sha256('test'),
+				env_test: armed.env('USER', 'default_user'),
+				command_result: armed.exec('echo', ['Hello, World!']),
+				date_check: {
+					local result = armed.exec('date', ['+%Y-%m-%d']),
+					success: result.exit_code == 0,
+					has_output: std.length(result.stdout) > 0
+				}
+			}`,
+			expected: map[string]interface{}{
+				"sha256_test": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				"env_test":    "testuser",
+				"command_result": map[string]interface{}{
+					"stdout":    "Hello, World!\n",
+					"stderr":    "",
+					"exit_code": float64(0),
+				},
+				"date_check": map[string]interface{}{
+					"success":    true,
+					"has_output": true,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
