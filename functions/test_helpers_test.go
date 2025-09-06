@@ -46,3 +46,11 @@ func getTimeFunction(name string) (func([]any) (any, error), error) {
 	}
 	return f.Func, nil
 }
+
+func getExecFunction(name string) (func([]any) (any, error), error) {
+	f, ok := functions.ExecFunctions[name]
+	if !ok {
+		return nil, fmt.Errorf("exec function %s not found", name)
+	}
+	return f.Func, nil
+}
