@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/alecthomas/kong"
 	"github.com/fujiwara/jsonnet-armed/functions"
@@ -12,9 +13,12 @@ import (
 )
 
 var output io.Writer = os.Stdout
+var outputMu sync.RWMutex
 
 // SetOutput sets the output destination for jsonnet evaluation results
 func SetOutput(w io.Writer) {
+	outputMu.Lock()
+	defer outputMu.Unlock()
 	output = w
 }
 
@@ -113,7 +117,10 @@ func writeOutput(outputFile, jsonStr string) error {
 	if outputFile != "" {
 		return os.WriteFile(outputFile, []byte(jsonStr), 0644)
 	}
-	_, err := io.WriteString(output, jsonStr)
+	outputMu.RLock()
+	writer := output
+	outputMu.RUnlock()
+	_, err := io.WriteString(writer, jsonStr)
 	return err
 }
 
