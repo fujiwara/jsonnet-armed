@@ -1,6 +1,7 @@
 package armed
 
 import (
+	"io"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -14,4 +15,7 @@ type CLI struct {
 	Version    kong.VersionFlag  `short:"v" help:"Show version and exit."`
 
 	Filename string `arg:"" name:"filename" help:"Filename or code to execute" type:"path"`
+
+	// writer for output (not exposed to CLI, used internally)
+	writer io.Writer `kong:"-"`
 }

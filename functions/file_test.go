@@ -192,17 +192,13 @@ func TestFileFunctions(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
-			// Create CLI config
+			// Create CLI config with output capture
+			var output bytes.Buffer
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
-
 			// Run evaluation
+			cli.SetWriter(&output)
 			err := armed.RunWithCLI(ctx, cli)
 
 			// Check error expectation
@@ -322,17 +318,13 @@ func TestFileExistsFunction(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
-			// Create CLI config
+			// Create CLI config with output capture
+			var output bytes.Buffer
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
-
 			// Run evaluation
+			cli.SetWriter(&output)
 			err := armed.RunWithCLI(ctx, cli)
 
 			// Check error expectation

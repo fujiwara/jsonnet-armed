@@ -165,17 +165,16 @@ func TestRunWithCLI(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
+			// Capture output
+			var output bytes.Buffer
+
 			// Create CLI config
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
 				ExtStr:   tt.extStr,
 				ExtCode:  tt.extCode,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout) // Restore default output
+			cli.SetWriter(&output)
 
 			// Run evaluation
 			err := armed.RunWithCLI(ctx, cli)
@@ -337,17 +336,16 @@ func TestRunWithCLIFromStdin(t *testing.T) {
 				io.WriteString(w, tt.jsonnet)
 			}()
 
+			// Capture output
+			var output bytes.Buffer
+
 			// Create CLI config with "-" as filename
 			cli := &armed.CLI{
 				Filename: "-",
 				ExtStr:   tt.extStr,
 				ExtCode:  tt.extCode,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
+			cli.SetWriter(&output)
 
 			// Run evaluation
 			err = armed.RunWithCLI(ctx, cli)
@@ -447,16 +445,15 @@ func TestRunWithCLITimeout(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
+			// Capture output
+			var output bytes.Buffer
+
 			// Create CLI config with timeout
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
 				Timeout:  tt.timeout,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
+			cli.SetWriter(&output)
 
 			// Run evaluation
 			err := armed.RunWithCLI(ctx, cli)
@@ -516,16 +513,15 @@ func TestRunWithCLITimeoutFromStdin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Capture output
+			var output bytes.Buffer
+
 			// Create CLI config with timeout and stdin
 			cli := &armed.CLI{
 				Filename: "-",
 				Timeout:  tt.timeout,
 			}
-
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
+			cli.SetWriter(&output)
 
 			// Mock stdin
 			oldStdin := os.Stdin
@@ -622,12 +618,6 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
-			// Create CLI config
-			cli := &armed.CLI{
-				Filename: jsonnetFile,
-				Timeout:  tt.timeout,
-			}
-
 			// Set up output writer
 			var output io.Writer
 			if tt.slowOutput {
@@ -636,8 +626,12 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 				output = &bytes.Buffer{}
 			}
 
-			armed.SetOutput(output)
-			defer armed.SetOutput(os.Stdout)
+			// Create CLI config
+			cli := &armed.CLI{
+				Filename: jsonnetFile,
+				Timeout:  tt.timeout,
+			}
+			cli.SetWriter(output)
 
 			// Run evaluation
 			err := armed.RunWithCLI(ctx, cli)

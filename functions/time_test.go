@@ -218,17 +218,14 @@ func TestTimeFunctions(t *testing.T) {
 				t.Fatalf("failed to write jsonnet file: %v", err)
 			}
 
-			// Create CLI config
+			// Create CLI config with output capture
+			var output bytes.Buffer
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
 			}
 
-			// Capture output
-			var output bytes.Buffer
-			armed.SetOutput(&output)
-			defer armed.SetOutput(os.Stdout)
-
 			// Run evaluation
+			cli.SetWriter(&output)
 			err := armed.RunWithCLI(ctx, cli)
 
 			// Check error expectation
@@ -267,13 +264,11 @@ func TestNowFunctionPrecision(t *testing.T) {
 		t.Fatalf("failed to write jsonnet file: %v", err)
 	}
 
+	var output bytes.Buffer
 	cli := &armed.CLI{
 		Filename: jsonnetFile,
 	}
-
-	var output bytes.Buffer
-	armed.SetOutput(&output)
-	defer armed.SetOutput(os.Stdout)
+	cli.SetWriter(&output)
 
 	if err := armed.RunWithCLI(ctx, cli); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -328,13 +323,11 @@ func TestTimeFormatWithArmedLibrary(t *testing.T) {
 		t.Fatalf("failed to write jsonnet file: %v", err)
 	}
 
+	var output bytes.Buffer
 	cli := &armed.CLI{
 		Filename: jsonnetFile,
 	}
-
-	var output bytes.Buffer
-	armed.SetOutput(&output)
-	defer armed.SetOutput(os.Stdout)
+	cli.SetWriter(&output)
 
 	if err := armed.RunWithCLI(ctx, cli); err != nil {
 		t.Fatalf("unexpected error: %v", err)

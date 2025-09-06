@@ -5,31 +5,36 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 
 	"github.com/alecthomas/kong"
 	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-jsonnet"
 )
 
-var output io.Writer = os.Stdout
-var outputMu sync.RWMutex
-
-// SetOutput sets the output destination for jsonnet evaluation results
+// SetOutput sets the output destination for jsonnet evaluation results (deprecated)
+// Use CLI.Writer field instead for thread-safe operation
 func SetOutput(w io.Writer) {
-	outputMu.Lock()
-	defer outputMu.Unlock()
-	output = w
+	// This function is kept for backward compatibility but should not be used
+	// in concurrent tests as it modifies global state
+}
+
+// SetWriter sets the writer for CLI
+func (cli *CLI) SetWriter(w io.Writer) {
+	cli.writer = w
 }
 
 func Run(ctx context.Context) error {
-	cli := &CLI{}
+	cli := &CLI{writer: os.Stdout}
 	kong.Parse(cli, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
 	return run(ctx, cli)
 }
 
 // RunWithCLI runs the jsonnet evaluation with the given CLI configuration
 func RunWithCLI(ctx context.Context, cli *CLI) error {
+	// Set default writer if not specified
+	if cli.writer == nil {
+		cli.writer = os.Stdout
+	}
 	return run(ctx, cli)
 }
 
@@ -53,7 +58,7 @@ func run(ctx context.Context, cli *CLI) error {
 		}
 
 		// Write output within the timeout scope
-		err = writeOutput(cli.OutputFile, jsonStr)
+		err = writeOutput(cli, jsonStr)
 		resultCh <- result{jsonStr: jsonStr, err: err}
 	}()
 
@@ -113,14 +118,11 @@ func evaluate(cli *CLI) (string, error) {
 	return jsonStr, nil
 }
 
-func writeOutput(outputFile, jsonStr string) error {
-	if outputFile != "" {
-		return os.WriteFile(outputFile, []byte(jsonStr), 0644)
+func writeOutput(cli *CLI, jsonStr string) error {
+	if cli.OutputFile != "" {
+		return os.WriteFile(cli.OutputFile, []byte(jsonStr), 0644)
 	}
-	outputMu.RLock()
-	writer := output
-	outputMu.RUnlock()
-	_, err := io.WriteString(writer, jsonStr)
+	_, err := io.WriteString(cli.writer, jsonStr)
 	return err
 }
 
