@@ -20,6 +20,7 @@ func TestGenerateArmedLib(t *testing.T) {
 		"base64url: std.native('base64url')",
 		"now: std.native('now')",
 		"time_format: std.native('time_format')",
+		"file_exists: std.native('file_exists')",
 	}
 
 	for _, expected := range expectedFunctions {

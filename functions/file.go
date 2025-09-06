@@ -56,4 +56,17 @@ var FileFunctions = []*jsonnet.NativeFunction{
 			}, nil
 		},
 	},
+	{
+		Name:   "file_exists",
+		Params: []ast.Identifier{"filename"},
+		Func: func(args []any) (any, error) {
+			filename, ok := args[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("file_exists: filename must be a string")
+			}
+
+			_, err := os.Stat(filename)
+			return err == nil, nil
+		},
+	},
 }
