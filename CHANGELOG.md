@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.0.4](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.3...v0.0.4) - 2025-09-06
+- Refactor native functions from slices to maps for O(1) access by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/15
+- Add exec functions for external command execution by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/17
+- Improve README structure and navigation by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/18
+- Move Usage section to improve first-time user experience by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/19
+- Optimize test performance by reducing sleep times by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/20
+
 ## [v0.0.3](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.2...v0.0.3) - 2025-09-06
 - Add stdin support with '-' filename by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/9
 - Add base64 encoding functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/10
