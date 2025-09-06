@@ -8,9 +8,8 @@ import (
 	"github.com/google/go-jsonnet/ast"
 )
 
-var EnvFunctions = []*jsonnet.NativeFunction{
-	{
-		Name:   "env",
+var EnvFunctions = map[string]*jsonnet.NativeFunction{
+	"env": {
 		Params: []ast.Identifier{"name", "default"},
 		Func: func(args []any) (any, error) {
 			key, ok := args[0].(string)
@@ -23,8 +22,7 @@ var EnvFunctions = []*jsonnet.NativeFunction{
 			return args[1], nil
 		},
 	},
-	{
-		Name:   "must_env",
+	"must_env": {
 		Params: []ast.Identifier{"name"},
 		Func: func(args []any) (any, error) {
 			key, ok := args[0].(string)
@@ -37,4 +35,8 @@ var EnvFunctions = []*jsonnet.NativeFunction{
 			return nil, fmt.Errorf("must_env: %s is not set", key)
 		},
 	},
+}
+
+func init() {
+	initializeFunctionMap(EnvFunctions)
 }

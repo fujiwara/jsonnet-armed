@@ -30,17 +30,15 @@ func getTimeFormat(format string) string {
 	return format
 }
 
-var TimeFunctions = []*jsonnet.NativeFunction{
-	{
-		Name:   "now",
+var TimeFunctions = map[string]*jsonnet.NativeFunction{
+	"now": {
 		Params: []ast.Identifier{},
 		Func: func(args []any) (any, error) {
 			// Return Unix timestamp as float64 with nanosecond precision
 			return float64(time.Now().UnixNano()) / float64(time.Second), nil
 		},
 	},
-	{
-		Name:   "time_format",
+	"time_format": {
 		Params: []ast.Identifier{"timestamp", "format"},
 		Func: func(args []any) (any, error) {
 			timestamp, ok := args[0].(float64)
@@ -65,4 +63,8 @@ var TimeFunctions = []*jsonnet.NativeFunction{
 			return t.Format(actualFormat), nil
 		},
 	},
+}
+
+func init() {
+	initializeFunctionMap(TimeFunctions)
 }

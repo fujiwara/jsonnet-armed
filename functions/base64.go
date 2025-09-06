@@ -8,9 +8,8 @@ import (
 	"github.com/google/go-jsonnet/ast"
 )
 
-var Base64Functions = []*jsonnet.NativeFunction{
-	{
-		Name:   "base64",
+var Base64Functions = map[string]*jsonnet.NativeFunction{
+	"base64": {
 		Params: []ast.Identifier{"data"},
 		Func: func(args []any) (any, error) {
 			data, ok := args[0].(string)
@@ -20,8 +19,7 @@ var Base64Functions = []*jsonnet.NativeFunction{
 			return base64.StdEncoding.EncodeToString([]byte(data)), nil
 		},
 	},
-	{
-		Name:   "base64url",
+	"base64url": {
 		Params: []ast.Identifier{"data"},
 		Func: func(args []any) (any, error) {
 			data, ok := args[0].(string)
@@ -31,4 +29,8 @@ var Base64Functions = []*jsonnet.NativeFunction{
 			return base64.URLEncoding.EncodeToString([]byte(data)), nil
 		},
 	},
+}
+
+func init() {
+	initializeFunctionMap(Base64Functions)
 }
