@@ -18,6 +18,100 @@ A Jsonnet rendering tool with additional useful functions.
 go install github.com/fujiwara/jsonnet-armed/cmd/jsonnet-armed@latest
 ```
 
+## Usage
+
+```bash
+jsonnet-armed [options] <jsonnet-file>
+```
+
+### Options
+
+- `-o, --output-file <file>`: Write output to file instead of stdout
+- `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
+- `--ext-code <key=value>`: Set external code variable (can be repeated)
+- `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
+- `-v, --version`: Show version and exit
+
+### Examples
+
+Basic usage:
+```bash
+# Render Jsonnet to stdout
+jsonnet-armed input.jsonnet
+
+# Write output to file
+jsonnet-armed -o output.json input.jsonnet
+```
+
+With external variables:
+```bash
+# Pass string variables
+jsonnet-armed -V env=production -V region=us-west-2 config.jsonnet
+
+# Pass code variables
+jsonnet-armed --ext-code replicas=3 --ext-code debug=true deployment.jsonnet
+
+# With timeout to prevent blocking operations
+jsonnet-armed -t 30s config.jsonnet
+
+# Read from stdin with timeout
+echo '{ value: "test" }' | jsonnet-armed -t 10s -
+```
+
+Example Jsonnet file using external variables and native functions:
+```jsonnet
+local env = std.native("env");
+local must_env = std.native("must_env");
+local md5 = std.native("md5");
+local sha256 = std.native("sha256");
+local sha256_file = std.native("sha256_file");
+local file_content = std.native("file_content");
+local file_stat = std.native("file_stat");
+local exec = std.native("exec");
+local exec_with_env = std.native("exec_with_env");
+
+{
+  // External variables
+  environment: std.extVar("env"),
+  region: std.extVar("region"),
+  replicas: std.extVar("replicas"),
+  debug: std.extVar("debug"),
+  
+  // Environment variables
+  home_dir: env("HOME", "/home/user"),
+  api_key: must_env("API_KEY"),
+  
+  // Hash functions
+  config_hash: sha256(std.extVar("env") + std.extVar("region")),
+  short_id: md5(std.extVar("instance_id"))[0:8],
+  
+  // File hash functions
+  dockerfile_hash: sha256_file("Dockerfile"),
+  config_file_integrity: sha256_file("/etc/app/config.yaml"),
+  
+  // File content and metadata
+  config: std.parseJson(file_content("/etc/app/config.json")),
+  config_modified: file_stat("/etc/app/config.json").mod_time,
+  is_large_config: file_stat("/etc/app/config.json").size > 1024,
+  
+  // Command execution
+  git_commit: exec("git", ["rev-parse", "HEAD"]).stdout[0:7],
+  build_info: {
+    local result = exec("date", ["+%Y-%m-%d %H:%M:%S"]),
+    timestamp: if result.exit_code == 0 then std.strReplace(result.stdout, "\n", "") else "unknown",
+    success: result.exit_code == 0
+  },
+  
+  // System information
+  system_info: {
+    local uname = exec("uname", ["-a"]),
+    local uptime = exec("uptime", []),
+    platform: if uname.exit_code == 0 then std.strReplace(uname.stdout, "\n", "") else "unknown",
+    uptime: if uptime.exit_code == 0 then std.strReplace(uptime.stdout, "\n", "") else "unknown"
+  }
+}
+```
+
 ## Native Functions
 
 jsonnet-armed provides built-in native functions that can be called using `std.native()`.
@@ -318,100 +412,6 @@ local file_exists = std.native("file_exists");
     content: if file_exists(filename) then file_content(filename) else null,
     stat: if file_exists(filename) then file_stat(filename) else null,
     safe_size: if file_exists(filename) then file_stat(filename).size else 0
-  }
-}
-```
-
-## Usage
-
-```bash
-jsonnet-armed [options] <jsonnet-file>
-```
-
-### Options
-
-- `-o, --output-file <file>`: Write output to file instead of stdout
-- `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
-- `--ext-code <key=value>`: Set external code variable (can be repeated)
-- `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
-- `-v, --version`: Show version and exit
-
-### Examples
-
-Basic usage:
-```bash
-# Render Jsonnet to stdout
-jsonnet-armed input.jsonnet
-
-# Write output to file
-jsonnet-armed -o output.json input.jsonnet
-```
-
-With external variables:
-```bash
-# Pass string variables
-jsonnet-armed -V env=production -V region=us-west-2 config.jsonnet
-
-# Pass code variables
-jsonnet-armed --ext-code replicas=3 --ext-code debug=true deployment.jsonnet
-
-# With timeout to prevent blocking operations
-jsonnet-armed -t 30s config.jsonnet
-
-# Read from stdin with timeout
-echo '{ value: "test" }' | jsonnet-armed -t 10s -
-```
-
-Example Jsonnet file using external variables and native functions:
-```jsonnet
-local env = std.native("env");
-local must_env = std.native("must_env");
-local md5 = std.native("md5");
-local sha256 = std.native("sha256");
-local sha256_file = std.native("sha256_file");
-local file_content = std.native("file_content");
-local file_stat = std.native("file_stat");
-local exec = std.native("exec");
-local exec_with_env = std.native("exec_with_env");
-
-{
-  // External variables
-  environment: std.extVar("env"),
-  region: std.extVar("region"),
-  replicas: std.extVar("replicas"),
-  debug: std.extVar("debug"),
-  
-  // Environment variables
-  home_dir: env("HOME", "/home/user"),
-  api_key: must_env("API_KEY"),
-  
-  // Hash functions
-  config_hash: sha256(std.extVar("env") + std.extVar("region")),
-  short_id: md5(std.extVar("instance_id"))[0:8],
-  
-  // File hash functions
-  dockerfile_hash: sha256_file("Dockerfile"),
-  config_file_integrity: sha256_file("/etc/app/config.yaml"),
-  
-  // File content and metadata
-  config: std.parseJson(file_content("/etc/app/config.json")),
-  config_modified: file_stat("/etc/app/config.json").mod_time,
-  is_large_config: file_stat("/etc/app/config.json").size > 1024,
-  
-  // Command execution
-  git_commit: exec("git", ["rev-parse", "HEAD"]).stdout[0:7],
-  build_info: {
-    local result = exec("date", ["+%Y-%m-%d %H:%M:%S"]),
-    timestamp: if result.exit_code == 0 then std.strReplace(result.stdout, "\n", "") else "unknown",
-    success: result.exit_code == 0
-  },
-  
-  // System information
-  system_info: {
-    local uname = exec("uname", ["-a"]),
-    local uptime = exec("uptime", []),
-    platform: if uname.exit_code == 0 then std.strReplace(uname.stdout, "\n", "") else "unknown",
-    uptime: if uptime.exit_code == 0 then std.strReplace(uptime.stdout, "\n", "") else "unknown"
   }
 }
 ```
