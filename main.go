@@ -30,6 +30,48 @@ func RunWithCLI(ctx context.Context, cli *CLI) error {
 }
 
 func run(ctx context.Context, cli *CLI) error {
+	// Apply timeout if specified
+	if cli.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cli.Timeout)
+		defer cancel()
+	}
+
+	// Create a channel to signal completion
+	resultCh := make(chan result, 1)
+
+	// Run evaluation and output in goroutine to enable timeout
+	go func() {
+		jsonStr, err := evaluate(cli)
+		if err != nil {
+			resultCh <- result{jsonStr: "", err: err}
+			return
+		}
+
+		// Write output within the timeout scope
+		err = writeOutput(cli.OutputFile, jsonStr)
+		resultCh <- result{jsonStr: jsonStr, err: err}
+	}()
+
+	// Wait for either completion or timeout
+	select {
+	case res := <-resultCh:
+		return res.err
+
+	case <-ctx.Done():
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("evaluation timed out after %v", cli.Timeout)
+		}
+		return ctx.Err()
+	}
+}
+
+type result struct {
+	jsonStr string
+	err     error
+}
+
+func evaluate(cli *CLI) (string, error) {
 	vm := jsonnet.MakeVM()
 
 	// Add importer for armed.libsonnet
@@ -54,20 +96,24 @@ func run(ctx context.Context, cli *CLI) error {
 		// Read from stdin
 		input, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			return fmt.Errorf("failed to read from stdin: %w", err)
+			return "", fmt.Errorf("failed to read from stdin: %w", err)
 		}
 		jsonStr, err = vm.EvaluateAnonymousSnippet("stdin", string(input))
 	} else {
 		jsonStr, err = vm.EvaluateFile(cli.Filename)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to evaluate: %w", err)
+		return "", fmt.Errorf("failed to evaluate: %w", err)
 	}
 
-	if cli.OutputFile != "" {
-		return os.WriteFile(cli.OutputFile, []byte(jsonStr), 0644)
+	return jsonStr, nil
+}
+
+func writeOutput(outputFile, jsonStr string) error {
+	if outputFile != "" {
+		return os.WriteFile(outputFile, []byte(jsonStr), 0644)
 	}
-	_, err = io.WriteString(output, jsonStr)
+	_, err := io.WriteString(output, jsonStr)
 	return err
 }
 

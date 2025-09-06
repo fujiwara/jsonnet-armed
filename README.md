@@ -248,6 +248,7 @@ jsonnet-armed [options] <jsonnet-file>
 - `-o, --output-file <file>`: Write output to file instead of stdout
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
+- `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
 - `-v, --version`: Show version and exit
 
 ### Examples
@@ -268,6 +269,12 @@ jsonnet-armed -V env=production -V region=us-west-2 config.jsonnet
 
 # Pass code variables
 jsonnet-armed --ext-code replicas=3 --ext-code debug=true deployment.jsonnet
+
+# With timeout to prevent blocking operations
+jsonnet-armed -t 30s config.jsonnet
+
+# Read from stdin with timeout
+echo '{ value: "test" }' | jsonnet-armed -t 10s -
 ```
 
 Example Jsonnet file using external variables and native functions:
