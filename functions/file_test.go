@@ -222,3 +222,133 @@ func TestFileFunctions(t *testing.T) {
 		})
 	}
 }
+
+func TestFileExistsFunction(t *testing.T) {
+	ctx := context.Background()
+
+	// Create test files
+	tmpDir := t.TempDir()
+	existingFile := filepath.Join(tmpDir, "exists.txt")
+	if err := os.WriteFile(existingFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	nonExistentFile := filepath.Join(tmpDir, "does_not_exist.txt")
+
+	tests := []struct {
+		name        string
+		jsonnet     string
+		expected    string
+		expectError bool
+	}{
+		{
+			name: "file_exists with existing file",
+			jsonnet: fmt.Sprintf(`
+			local file_exists = std.native("file_exists");
+			{
+				exists: file_exists("%s")
+			}`, existingFile),
+			expected: `{
+				"exists": true
+			}`,
+		},
+		{
+			name: "file_exists with non-existent file",
+			jsonnet: fmt.Sprintf(`
+			local file_exists = std.native("file_exists");
+			{
+				exists: file_exists("%s")
+			}`, nonExistentFile),
+			expected: `{
+				"exists": false
+			}`,
+		},
+		{
+			name: "file_exists with directory",
+			jsonnet: fmt.Sprintf(`
+			local file_exists = std.native("file_exists");
+			{
+				exists: file_exists("%s")
+			}`, tmpDir),
+			expected: `{
+				"exists": true
+			}`,
+		},
+		{
+			name: "file_exists with invalid argument type",
+			jsonnet: `
+			local file_exists = std.native("file_exists");
+			file_exists(123)`,
+			expectError: true,
+		},
+		{
+			name: "file_exists with armed library",
+			jsonnet: fmt.Sprintf(`
+			local armed = import 'armed.libsonnet';
+			{
+				file_exists: armed.file_exists("%s"),
+				file_missing: armed.file_exists("%s")
+			}`, existingFile, nonExistentFile),
+			expected: `{
+				"file_exists": true,
+				"file_missing": false
+			}`,
+		},
+		{
+			name: "file_exists with conditional logic",
+			jsonnet: fmt.Sprintf(`
+			local file_exists = std.native("file_exists");
+			local file_content = std.native("file_content");
+			local filename = "%s";
+			{
+				filename: filename,
+				exists: file_exists(filename),
+				content: if file_exists(filename) then file_content(filename) else "File not found"
+			}`, existingFile),
+			expected: `{
+				"filename": "` + existingFile + `",
+				"exists": true,
+				"content": "test content"
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file with jsonnet content
+			tmpDir := t.TempDir()
+			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
+				t.Fatalf("failed to write jsonnet file: %v", err)
+			}
+
+			// Create CLI config
+			cli := &armed.CLI{
+				Filename: jsonnetFile,
+			}
+
+			// Capture output
+			var output bytes.Buffer
+			armed.SetOutput(&output)
+			defer armed.SetOutput(os.Stdout)
+
+			// Run evaluation
+			err := armed.RunWithCLI(ctx, cli)
+
+			// Check error expectation
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Compare JSON output
+			compareJSON(t, output.String(), tt.expected)
+		})
+	}
+}

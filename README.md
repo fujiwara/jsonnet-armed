@@ -191,21 +191,33 @@ Access file content and metadata directly from Jsonnet.
 Available file functions:
 - `file_content(filename)`: Read file content as string
 - `file_stat(filename)`: Get file metadata as object
+- `file_exists(filename)`: Check if file or directory exists (returns boolean)
 
 ```jsonnet
 local file_content = std.native("file_content");
 local file_stat = std.native("file_stat");
+local file_exists = std.native("file_exists");
 
 {
-  // Read file content
-  config_content: file_content("/etc/config.json"),
-  readme: file_content("README.md"),
+  // Check file existence
+  config_exists: file_exists("/etc/config.json"),        // true/false
+  readme_exists: file_exists("README.md"),               // true/false
+  dir_exists: file_exists("/etc"),                       // true (works for directories too)
   
-  // Parse JSON files directly
-  config: std.parseJson(file_content("/etc/config.json")),
+  // Conditional file reading
+  config: if file_exists("/etc/config.json") 
+          then std.parseJson(file_content("/etc/config.json"))
+          else {"default": "config"},
   
-  // Get file metadata
-  config_stat: file_stat("/etc/config.json"),
+  // Read file content (only if exists)
+  config_content: if file_exists("/etc/config.json") 
+                  then file_content("/etc/config.json") 
+                  else "File not found",
+  
+  // Get file metadata (only if exists)
+  config_stat: if file_exists("/etc/config.json") 
+               then file_stat("/etc/config.json")
+               else null,
   
   // File information includes:
   // - name: filename
@@ -214,11 +226,13 @@ local file_stat = std.native("file_stat");
   // - mod_time: modification time as Unix timestamp
   // - is_dir: true if directory, false if regular file
   
-  // Combine content and metadata
+  // Safe file operations
   file_info: {
-    content: file_content("data.txt"),
-    stat: file_stat("data.txt"),
-    content_matches_size: std.length(file_content("data.txt")) == file_stat("data.txt").size
+    local filename = "data.txt",
+    exists: file_exists(filename),
+    content: if file_exists(filename) then file_content(filename) else null,
+    stat: if file_exists(filename) then file_stat(filename) else null,
+    safe_size: if file_exists(filename) then file_stat(filename).size else 0
   }
 }
 ```
