@@ -1,172 +1,59 @@
-package functions_test
+package functions
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/fujiwara/jsonnet-armed"
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestEnvFunctions(t *testing.T) {
-	ctx := context.Background()
+func TestEnvFunction(t *testing.T) {
+	envFunc := EnvFunctions[0].Func // env function
 
-	// Set test environment variables
+	// Set test environment variable
 	t.Setenv("TEST_ENV_VAR", "test-value")
-	t.Setenv("TEST_NUMBER", "42")
 
 	tests := []struct {
 		name        string
-		jsonnet     string
-		expected    string
+		args        []any
+		expected    any
 		expectError bool
 	}{
 		{
-			name: "env function with existing variable",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_ENV_VAR", "default")
-			}`,
-			expected: `{
-				"value": "test-value"
-			}`,
+			name:     "existing variable",
+			args:     []any{"TEST_ENV_VAR", "default"},
+			expected: "test-value",
 		},
 		{
-			name: "env function with non-existing variable returns default",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_UNSET_VAR", "default-value")
-			}`,
-			expected: `{
-				"value": "default-value"
-			}`,
+			name:     "non-existing variable returns default",
+			args:     []any{"TEST_UNSET_VAR", "default-value"},
+			expected: "default-value",
 		},
 		{
-			name: "env function with multiple calls",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				existing: env("TEST_ENV_VAR", "default1"),
-				missing: env("TEST_UNSET_VAR", "default2"),
-				number: env("TEST_NUMBER", "0")
-			}`,
-			expected: `{
-				"existing": "test-value",
-				"missing": "default2",
-				"number": "42"
-			}`,
+			name:     "empty string as default",
+			args:     []any{"TEST_UNSET_VAR", ""},
+			expected: "",
 		},
 		{
-			name: "must_env with existing variable",
-			jsonnet: `
-			local must_env = std.native("must_env");
-			{
-				value: must_env("TEST_ENV_VAR")
-			}`,
-			expected: `{
-				"value": "test-value"
-			}`,
+			name:     "null as default",
+			args:     []any{"TEST_UNSET_VAR", nil},
+			expected: nil,
 		},
 		{
-			name: "must_env with non-existing variable returns error",
-			jsonnet: `
-			local must_env = std.native("must_env");
-			{
-				value: must_env("TEST_UNSET_VAR")
-			}`,
+			name:     "object as default",
+			args:     []any{"TEST_UNSET_VAR", map[string]any{"key": "value"}},
+			expected: map[string]any{"key": "value"},
+		},
+		{
+			name:        "non-string name",
+			args:        []any{123, "default"},
 			expectError: true,
-		},
-		{
-			name: "env with empty string as default",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_UNSET_VAR", "")
-			}`,
-			expected: `{
-				"value": ""
-			}`,
-		},
-		{
-			name: "env with null as default",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_UNSET_VAR", null)
-			}`,
-			expected: `{
-				"value": null
-			}`,
-		},
-		{
-			name: "env with object as default",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_UNSET_VAR", { key: "value" })
-			}`,
-			expected: `{
-				"value": {
-					"key": "value"
-				}
-			}`,
-		},
-		{
-			name: "env with array as default",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_UNSET_VAR", [1, 2, 3])
-			}`,
-			expected: `{
-				"value": [1, 2, 3]
-			}`,
-		},
-		{
-			name: "combining env functions with jsonnet logic",
-			jsonnet: `
-			local env = std.native("env");
-			local envValue = env("TEST_ENV_VAR", "default");
-			{
-				original: envValue,
-				uppercase: std.asciiUpper(envValue),
-				length: std.length(envValue),
-				conditional: if envValue == "test-value" then "matched" else "not matched"
-			}`,
-			expected: `{
-				"original": "test-value",
-				"uppercase": "TEST-VALUE",
-				"length": 10,
-				"conditional": "matched"
-			}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp file with jsonnet content
-			tmpDir := t.TempDir()
-			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
-			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
-				t.Fatalf("failed to write jsonnet file: %v", err)
-			}
+			result, err := envFunc(tt.args)
 
-			// Create CLI config with output capture
-			var output bytes.Buffer
-			cli := &armed.CLI{
-				Filename: jsonnetFile,
-			}
-			// Run evaluation
-			cli.SetWriter(&output)
-			err := cli.Run(ctx)
-
-			// Check error expectation
 			if tt.expectError {
 				if err == nil {
 					t.Fatal("expected error but got nil")
@@ -178,85 +65,94 @@ func TestEnvFunctions(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Compare JSON output
-			compareJSON(t, output.String(), tt.expected)
+			if diff := cmp.Diff(tt.expected, result); diff != "" {
+				t.Errorf("result mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
 
-func TestEnvFunctionsWithEmptyEnvVar(t *testing.T) {
-	ctx := context.Background()
+func TestEnvFunctionWithEmptyEnvVar(t *testing.T) {
+	envFunc := EnvFunctions[0].Func // env function
 
 	// Set environment variable to empty string
 	t.Setenv("TEST_EMPTY_VAR", "")
 
+	result, err := envFunc([]any{"TEST_EMPTY_VAR", "default"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Empty environment variable should return default
+	if result != "default" {
+		t.Errorf("expected 'default', got %v", result)
+	}
+}
+
+func TestMustEnvFunction(t *testing.T) {
+	mustEnvFunc := EnvFunctions[1].Func // must_env function
+
+	// Set test environment variable
+	t.Setenv("TEST_ENV_VAR", "test-value")
+
 	tests := []struct {
-		name     string
-		jsonnet  string
-		expected string
+		name        string
+		args        []any
+		expected    any
+		expectError bool
 	}{
 		{
-			name: "env function with empty string environment variable",
-			jsonnet: `
-			local env = std.native("env");
-			{
-				value: env("TEST_EMPTY_VAR", "default")
-			}`,
-			expected: `{
-				"value": "default"
-			}`,
+			name:     "existing variable",
+			args:     []any{"TEST_ENV_VAR"},
+			expected: "test-value",
 		},
 		{
-			name: "must_env with empty string environment variable",
-			jsonnet: `
-			local must_env = std.native("must_env");
-			{
-				value: must_env("TEST_EMPTY_VAR")
-			}`,
-			expected: `{
-				"value": ""
-			}`,
+			name:        "non-existing variable",
+			args:        []any{"TEST_UNSET_VAR"},
+			expectError: true,
+		},
+		{
+			name:        "non-string name",
+			args:        []any{123},
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
-			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
-				t.Fatalf("failed to write jsonnet file: %v", err)
+			result, err := mustEnvFunc(tt.args)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				return
 			}
 
-			var output bytes.Buffer
-			cli := &armed.CLI{
-				Filename: jsonnetFile,
-			}
-			cli.SetWriter(&output)
-
-			if err := cli.Run(ctx); err != nil {
+			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			compareJSON(t, output.String(), tt.expected)
+			if diff := cmp.Diff(tt.expected, result); diff != "" {
+				t.Errorf("result mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
 
-// compareJSON compares two JSON strings for equality
-func compareJSON(t *testing.T, got, want string) {
-	t.Helper()
+func TestMustEnvWithEmptyEnvVar(t *testing.T) {
+	mustEnvFunc := EnvFunctions[1].Func // must_env function
 
-	var gotJSON, wantJSON interface{}
+	// Set environment variable to empty string
+	t.Setenv("TEST_EMPTY_VAR", "")
 
-	if err := json.Unmarshal([]byte(got), &gotJSON); err != nil {
-		t.Fatalf("failed to parse got JSON: %v\nJSON: %s", err, got)
+	result, err := mustEnvFunc([]any{"TEST_EMPTY_VAR"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := json.Unmarshal([]byte(want), &wantJSON); err != nil {
-		t.Fatalf("failed to parse want JSON: %v\nJSON: %s", err, want)
-	}
-
-	if diff := cmp.Diff(wantJSON, gotJSON); diff != "" {
-		t.Errorf("JSON mismatch (-want +got):\n%s", diff)
+	// Empty environment variable should still be returned (it exists)
+	if result != "" {
+		t.Errorf("expected empty string, got %v", result)
 	}
 }
