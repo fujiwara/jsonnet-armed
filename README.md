@@ -5,10 +5,12 @@ A Jsonnet rendering tool with additional useful functions.
 ## Features
 
 - Standard Jsonnet evaluation with external variables support
-- Built-in native functions for environment variable access
-- Hash functions for cryptographic operations
-- File functions for reading content and metadata
-- External command execution with timeout and cancellation
+- [Environment variable access functions](#environment-functions) (`env`, `must_env`)
+- [Time functions](#time-functions) for current timestamp and formatting
+- [Base64 encoding functions](#base64-functions) (standard and URL-safe)
+- [Hash functions](#hash-functions) for cryptographic operations
+- [External command execution](#external-command-execution) with timeout and cancellation
+- [File functions](#file-functions) for reading content and metadata
 
 ## Installation
 
@@ -35,28 +37,25 @@ local armed = import 'armed.libsonnet';
 
 You can also use the traditional approach with `std.native()`:
 
-### env(name, default)
-Get an environment variable with a default value.
+### Environment Functions
+
+Access environment variables with optional default values or strict requirements.
+
+Available environment functions:
+- `env(name, default)`: Get environment variable with default value
+- `must_env(name)`: Get environment variable that must exist (fails if not set)
 
 ```jsonnet
 local env = std.native("env");
+local must_env = std.native("must_env");
 
 {
   // Returns the value of HOME environment variable, or "/tmp" if not set
   home: env("HOME", "/tmp"),
   
   // Can use any JSON value as default
-  config: env("CONFIG", { debug: false })
-}
-```
-
-### must_env(name)
-Get an environment variable that must exist. Returns an error if the variable is not set.
-
-```jsonnet
-local must_env = std.native("must_env");
-
-{
+  config: env("CONFIG", { debug: false }),
+  
   // Will fail if DATABASE_URL is not set
   database_url: must_env("DATABASE_URL")
 }
