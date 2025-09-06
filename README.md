@@ -60,6 +60,53 @@ local must_env = std.native("must_env");
 }
 ```
 
+### Time Functions
+Work with current time and timestamp formatting.
+
+Available time functions:
+- `now()`: Get current Unix timestamp as floating-point number (nanosecond precision)
+- `time_format(timestamp, format)`: Format timestamp using Go's time layout or predefined constants
+
+**Supported Go Time Format Constants:**
+For convenience, `time_format()` supports these common Go time format constant names as strings:
+
+| Constant Name | Format String | Example Output |
+|---------------|---------------|----------------|
+| `"RFC3339"` | `"2006-01-02T15:04:05Z07:00"` | `"2024-01-15T10:30:45Z"` |
+| `"RFC3339Nano"` | `"2006-01-02T15:04:05.999999999Z07:00"` | `"2024-01-15T10:30:45.123456789Z"` |
+| `"RFC1123"` | `"Mon, 02 Jan 2006 15:04:05 MST"` | `"Mon, 15 Jan 2024 10:30:45 UTC"` |
+| `"RFC1123Z"` | `"Mon, 02 Jan 2006 15:04:05 -0700"` | `"Mon, 15 Jan 2024 10:30:45 +0000"` |
+| `"DateTime"` | `"2006-01-02 15:04:05"` | `"2024-01-15 10:30:45"` |
+| `"DateOnly"` | `"2006-01-02"` | `"2024-01-15"` |
+| `"TimeOnly"` | `"15:04:05"` | `"10:30:45"` |
+
+```jsonnet
+local now = std.native("now");
+local time_format = std.native("time_format");
+
+{
+  // Current time
+  timestamp: now(),                        // 1705314645.123456789
+  
+  // Using predefined format constants (recommended)
+  iso_time: time_format(now(), "RFC3339"),             // "2024-01-15T10:30:45Z"
+  date_only: time_format(now(), "DateOnly"),           // "2024-01-15"
+  time_only: time_format(now(), "TimeOnly"),           // "10:30:45" 
+  readable: time_format(now(), "DateTime"),            // "2024-01-15 10:30:45"
+  
+  // Using custom Go time format strings  
+  custom: time_format(now(), "2006/01/02 15:04:05"),   // "2024/01/15 10:30:45"
+  year_month: time_format(now(), "2006-01"),           // "2024-01"
+  
+  // Format specific timestamp
+  formatted: time_format(1705314645.123456789, "RFC3339Nano"), // "2024-01-15T10:30:45.123456716Z"
+  
+  // Useful for TTL, expiration times
+  timestamp_ms: now() * 1000,              // Convert to milliseconds
+  timestamp_sec: std.floor(now()),         // Integer seconds only
+}
+```
+
 ### Base64 Functions
 Encode strings to Base64 format.
 

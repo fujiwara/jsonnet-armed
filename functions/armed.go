@@ -13,6 +13,7 @@ func AllFunctions() []*jsonnet.NativeFunction {
 	all = append(all, HashFunctions...)
 	all = append(all, FileFunctions...)
 	all = append(all, Base64Functions...)
+	all = append(all, TimeFunctions...)
 	return all
 }
 
