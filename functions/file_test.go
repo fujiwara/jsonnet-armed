@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestFileContentFunction(t *testing.T) {
-	fileContentFunc := functions.FileFunctions[0].Func // file_content function
+	fileContentFunc, err := getFileFunction("file_content")
+	if err != nil {
+		t.Fatalf("failed to get file_content function: %v", err)
+	}
 
 	// Create test file
 	tmpDir := t.TempDir()
@@ -66,7 +68,10 @@ func TestFileContentFunction(t *testing.T) {
 }
 
 func TestFileStatFunction(t *testing.T) {
-	fileStatFunc := functions.FileFunctions[1].Func // file_stat function
+	fileStatFunc, err := getFileFunction("file_stat")
+	if err != nil {
+		t.Fatalf("failed to get file_stat function: %v", err)
+	}
 
 	// Create test file
 	tmpDir := t.TempDir()
@@ -140,7 +145,10 @@ func TestFileStatFunction(t *testing.T) {
 }
 
 func TestFileExistsFunction(t *testing.T) {
-	fileExistsFunc := functions.FileFunctions[2].Func // file_exists function
+	fileExistsFunc, err := getFileFunction("file_exists")
+	if err != nil {
+		t.Fatalf("failed to get file_exists function: %v", err)
+	}
 
 	// Create test file
 	tmpDir := t.TempDir()

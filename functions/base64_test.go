@@ -3,12 +3,14 @@ package functions_test
 import (
 	"testing"
 
-	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestBase64Function(t *testing.T) {
-	base64Func := functions.Base64Functions[0].Func // base64 function
+	base64Func, err := getBase64Function("base64")
+	if err != nil {
+		t.Fatalf("failed to get base64 function: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -66,7 +68,10 @@ func TestBase64Function(t *testing.T) {
 }
 
 func TestBase64URLFunction(t *testing.T) {
-	base64urlFunc := functions.Base64Functions[1].Func // base64url function
+	base64urlFunc, err := getBase64Function("base64url")
+	if err != nil {
+		t.Fatalf("failed to get base64url function: %v", err)
+	}
 
 	tests := []struct {
 		name        string

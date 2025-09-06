@@ -3,12 +3,14 @@ package functions_test
 import (
 	"testing"
 
-	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestEnvFunction(t *testing.T) {
-	envFunc := functions.EnvFunctions[0].Func // env function
+	envFunc, err := getEnvFunction("env")
+	if err != nil {
+		t.Fatalf("failed to get env function: %v", err)
+	}
 
 	// Set test environment variable
 	t.Setenv("TEST_ENV_VAR", "test-value")
@@ -74,7 +76,10 @@ func TestEnvFunction(t *testing.T) {
 }
 
 func TestEnvFunctionWithEmptyEnvVar(t *testing.T) {
-	envFunc := functions.EnvFunctions[0].Func // env function
+	envFunc, err := getEnvFunction("env")
+	if err != nil {
+		t.Fatalf("failed to get env function: %v", err)
+	}
 
 	// Set environment variable to empty string
 	t.Setenv("TEST_EMPTY_VAR", "")
@@ -91,7 +96,10 @@ func TestEnvFunctionWithEmptyEnvVar(t *testing.T) {
 }
 
 func TestMustEnvFunction(t *testing.T) {
-	mustEnvFunc := functions.EnvFunctions[1].Func // must_env function
+	mustEnvFunc, err := getEnvFunction("must_env")
+	if err != nil {
+		t.Fatalf("failed to get must_env function: %v", err)
+	}
 
 	// Set test environment variable
 	t.Setenv("TEST_ENV_VAR", "test-value")
@@ -142,7 +150,10 @@ func TestMustEnvFunction(t *testing.T) {
 }
 
 func TestMustEnvWithEmptyEnvVar(t *testing.T) {
-	mustEnvFunc := functions.EnvFunctions[1].Func // must_env function
+	mustEnvFunc, err := getEnvFunction("must_env")
+	if err != nil {
+		t.Fatalf("failed to get must_env function: %v", err)
+	}
 
 	// Set environment variable to empty string
 	t.Setenv("TEST_EMPTY_VAR", "")

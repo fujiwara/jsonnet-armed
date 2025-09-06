@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestNowFunction(t *testing.T) {
-	nowFunc := functions.TimeFunctions[0].Func // now function
+	nowFunc, err := getTimeFunction("now")
+	if err != nil {
+		t.Fatalf("failed to get now function: %v", err)
+	}
 
 	// Call the function
 	result, err := nowFunc([]any{})
@@ -32,7 +34,10 @@ func TestNowFunction(t *testing.T) {
 }
 
 func TestTimeFormatFunction(t *testing.T) {
-	timeFormatFunc := functions.TimeFunctions[1].Func // time_format function
+	timeFormatFunc, err := getTimeFunction("time_format")
+	if err != nil {
+		t.Fatalf("failed to get time_format function: %v", err)
+	}
 
 	// Fixed timestamp for consistent testing
 	// 2024-01-15 10:30:45 UTC
@@ -109,7 +114,10 @@ func TestTimeFormatFunction(t *testing.T) {
 }
 
 func TestTimeFormatWithNanoseconds(t *testing.T) {
-	timeFormatFunc := functions.TimeFunctions[1].Func // time_format function
+	timeFormatFunc, err := getTimeFunction("time_format")
+	if err != nil {
+		t.Fatalf("failed to get time_format function: %v", err)
+	}
 
 	// Timestamp with fractional seconds (nanosecond precision)
 	timestamp := 1705314645.123456789

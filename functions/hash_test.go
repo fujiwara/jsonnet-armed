@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/fujiwara/jsonnet-armed/functions"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestMD5Function(t *testing.T) {
-	md5Func := functions.HashFunctions[0].Func // md5 function
+	md5Func, err := getHashFunction("md5")
+	if err != nil {
+		t.Fatalf("failed to get md5 function: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -58,7 +60,10 @@ func TestMD5Function(t *testing.T) {
 }
 
 func TestSHA256Function(t *testing.T) {
-	sha256Func := functions.HashFunctions[2].Func // sha256 function
+	sha256Func, err := getHashFunction("sha256")
+	if err != nil {
+		t.Fatalf("failed to get sha256 function: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -94,7 +99,10 @@ func TestSHA256Function(t *testing.T) {
 }
 
 func TestMD5FileFunction(t *testing.T) {
-	md5FileFunc := functions.HashFunctions[4].Func // md5_file function
+	md5FileFunc, err := getHashFunction("md5_file")
+	if err != nil {
+		t.Fatalf("failed to get md5_file function: %v", err)
+	}
 
 	// Create test file
 	tmpDir := t.TempDir()
