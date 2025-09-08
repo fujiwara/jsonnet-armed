@@ -248,10 +248,10 @@ func TestExecTimeout(t *testing.T) {
 
 	// This should timeout (3 seconds is the test timeout, we sleep for 5 seconds)
 	result, err := execFunc([]any{sleepCmd, []any{sleepArg}})
-	
+
 	t.Logf("Result: %v", result)
 	t.Logf("Error: %v", err)
-	
+
 	if err == nil {
 		t.Error("expected timeout error but got nil")
 	}
@@ -281,15 +281,15 @@ func TestExecTimeoutSIGKILL(t *testing.T) {
 
 	// This shell script ignores SIGTERM but will be killed by SIGKILL
 	script := `trap '' TERM; sleep 5`
-	
+
 	t.Logf("Running script that ignores SIGTERM")
 
 	// This should timeout and be killed by SIGKILL after WaitDelay
 	result, err := execFunc([]any{"sh", []any{"-c", script}})
-	
+
 	t.Logf("Result: %v", result)
 	t.Logf("Error: %v", err)
-	
+
 	if err == nil {
 		t.Error("expected timeout error but got nil")
 	}

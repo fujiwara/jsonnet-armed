@@ -17,7 +17,7 @@ var (
 	// Global context for exec functions
 	execContextMu sync.RWMutex
 	execContext   context.Context = context.Background()
-	
+
 	// DefaultExecTimeout is the default timeout for exec commands
 	DefaultExecTimeout = 30 * time.Second
 )
@@ -120,7 +120,7 @@ var ExecFunctions = map[string]*jsonnet.NativeFunction{
 func executeCommand(command string, args []string, envVars []string) (map[string]any, error) {
 	// Use parent context if available, otherwise use Background
 	parentCtx := getExecContext()
-	
+
 	// Add timeout to the parent context
 	ctx, cancel := context.WithTimeout(parentCtx, DefaultExecTimeout)
 	defer cancel()
