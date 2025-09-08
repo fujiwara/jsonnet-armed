@@ -7,7 +7,10 @@ require (
 	golang.org/x/sys v0.35.0
 )
 
-require github.com/google/go-cmp v0.7.0 // indirect
+require (
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/hashicorp/go-envparse v0.1.0 // indirect
+)
 
 require (
 	github.com/alecthomas/kong v1.12.1

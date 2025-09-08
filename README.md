@@ -138,10 +138,13 @@ Access environment variables with optional default values or strict requirements
 Available environment functions:
 - `env(name, default)`: Get environment variable with default value
 - `must_env(name)`: Get environment variable that must exist (fails if not set)
+- `env_parse(content)`: Parse environment file content and return as object
 
 ```jsonnet
 local env = std.native("env");
 local must_env = std.native("must_env");
+local env_parse = std.native("env_parse");
+local file_content = std.native("file_content");
 
 {
   // Returns the value of HOME environment variable, or "/tmp" if not set
@@ -151,7 +154,19 @@ local must_env = std.native("must_env");
   config: env("CONFIG", { debug: false }),
   
   // Will fail if DATABASE_URL is not set
-  database_url: must_env("DATABASE_URL")
+  database_url: must_env("DATABASE_URL"),
+  
+  // Parse .env file content
+  env_from_file: env_parse(file_content(".env")),
+  
+  // Parse inline env format string
+  parsed_env: env_parse("KEY1=value1\nKEY2=value2\n# comment\nKEY3=value3"),
+  // Result: {"KEY1": "value1", "KEY2": "value2", "KEY3": "value3"}
+  
+  // Use parsed env values
+  local env_vars = env_parse(file_content(".env")),
+  api_url: env_vars.API_URL,
+  api_key: env_vars.API_KEY
 }
 ```
 
