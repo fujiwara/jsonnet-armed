@@ -11,6 +11,7 @@ jsonnet-armed is a Jsonnet rendering tool with additional useful functions. It e
 - Use `github.com/google/go-cmp` for JSON comparison
 - Compare JSON outputs by parsing them and using `cmp.Diff` for structural comparison
 - Do not replace `os.Stdout` in tests; use `armed.SetOutput(io.Writer)` instead
+- When adding new native functions, add both unit tests (in `functions/*_test.go`) and integration tests (in `integration_test.go`)
 
 ### Test Structure Example
 ```go
@@ -52,10 +53,48 @@ func compareJSON(t *testing.T, got, want string) {
 - Code variables are evaluated as Jsonnet expressions
 
 ### Native Functions
-- Environment functions: `env(name, default)` and `must_env(name)`
+- Environment functions: `env(name, default)`, `must_env(name)`, and `env_parse(content)`
+  - `env_parse` parses .env format strings and returns a map[string]any for JSON compatibility
 - Hash functions: `md5(data)`, `sha1(data)`, `sha256(data)`, `sha512(data)` return hash as hexadecimal string
 - File hash functions: `md5_file(filename)`, `sha1_file(filename)`, `sha256_file(filename)`, `sha512_file(filename)` return file content hash as hexadecimal string
 - File functions: `file_content(filename)` returns file content as string, `file_stat(filename)` returns file metadata object
+
+### Native Function Implementation Notes
+- All native functions must return JSON-compatible types (`any`/`interface{}`)
+- When returning maps, use `map[string]any` instead of `map[string]string` for Jsonnet compatibility
+- External dependencies (like `github.com/hashicorp/go-envparse`) should be added via `go get`
+- Always add test coverage:
+  - Unit tests in `functions/<function>_test.go` for detailed testing
+  - At least one integration test case in `integration_test.go` to verify end-to-end functionality
+  - If function reads files, create test fixtures in `testdata/` directory
+
+## Development Workflow
+
+### Go Module Management
+- Always run `go mod tidy` after adding or updating dependencies
+- This ensures go.mod and go.sum are properly synchronized
+- Example workflow:
+  ```bash
+  go get github.com/some/package
+  go mod tidy
+  ```
+
+### Code Formatting
+- Always run `go fmt ./...` before committing code
+- This ensures consistent code formatting across the project
+- Make it a habit to format before every commit
+
+### Git Commit Best Practices
+- Use `git add <file>` to add specific files instead of `git add -A`
+- This prevents accidentally committing unintended changes
+- Review each file before adding:
+  ```bash
+  git status
+  git add functions/new_function.go
+  git add functions/new_function_test.go
+  git add go.mod go.sum
+  git commit -m "Add new function"
+  ```
 
 ## Development Commands
 

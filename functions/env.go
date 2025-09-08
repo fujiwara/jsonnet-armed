@@ -3,9 +3,11 @@ package functions
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/go-jsonnet"
 	"github.com/google/go-jsonnet/ast"
+	"github.com/hashicorp/go-envparse"
 )
 
 var EnvFunctions = map[string]*jsonnet.NativeFunction{
@@ -33,6 +35,25 @@ var EnvFunctions = map[string]*jsonnet.NativeFunction{
 				return v, nil
 			}
 			return nil, fmt.Errorf("must_env: %s is not set", key)
+		},
+	},
+	"env_parse": {
+		Params: []ast.Identifier{"content"},
+		Func: func(args []any) (any, error) {
+			content, ok := args[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("env_parse: content must be a string")
+			}
+			envMap, err := envparse.Parse(strings.NewReader(content))
+			if err != nil {
+				return nil, fmt.Errorf("env_parse: failed to parse: %w", err)
+			}
+			// Convert map[string]string to map[string]any for JSON compatibility
+			result := make(map[string]any)
+			for k, v := range envMap {
+				result[k] = v
+			}
+			return result, nil
 		},
 	},
 }

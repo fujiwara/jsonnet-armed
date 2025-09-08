@@ -263,6 +263,54 @@ func TestIntegrationExamples(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "env_parse function",
+			jsonnet: `
+			local env_parse = std.native("env_parse");
+			local file_content = std.native("file_content");
+			{
+				// Parse .env file content
+				env_from_file: env_parse(file_content("testdata/test.env")),
+				
+				// Parse inline env format string
+				inline_env: env_parse("KEY1=value1\nKEY2=value2\n# comment\nKEY3=value3"),
+				
+				// Use parsed env values
+				database_url: env_parse(file_content("testdata/test.env")).DATABASE_URL,
+				api_key: env_parse(file_content("testdata/test.env")).API_KEY,
+				
+				// Handle empty content
+				empty: env_parse(""),
+				
+				// Parse with various formats
+				mixed_format: env_parse("SIMPLE=value\nexport EXPORTED=exported_value\n# Comment line\n\nQUOTED=\"quoted value\"\n")
+			}`,
+			expected: map[string]interface{}{
+				"env_from_file": map[string]interface{}{
+					"DATABASE_URL":  "postgres://user:pass@localhost/db",
+					"API_KEY":       "secret-key-123",
+					"DEBUG":         "true",
+					"PORT":          "8080",
+					"TIMEOUT":       "30s",
+					"MESSAGE":       "Hello, World!",
+					"SINGLE_QUOTES": "Another message",
+					"LAST_VAR":      "final_value",
+				},
+				"inline_env": map[string]interface{}{
+					"KEY1": "value1",
+					"KEY2": "value2",
+					"KEY3": "value3",
+				},
+				"database_url": "postgres://user:pass@localhost/db",
+				"api_key":      "secret-key-123",
+				"empty":        map[string]interface{}{},
+				"mixed_format": map[string]interface{}{
+					"SIMPLE":   "value",
+					"EXPORTED": "exported_value",
+					"QUOTED":   "quoted value",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
