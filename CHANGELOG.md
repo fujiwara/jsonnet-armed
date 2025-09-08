@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.5](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.4...v0.0.5) - 2025-09-08
+- Add env_parse native function by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/21
+
 ## [v0.0.4](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.3...v0.0.4) - 2025-09-06
 - Refactor native functions from slices to maps for O(1) access by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/15
 - Add exec functions for external command execution by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/17
