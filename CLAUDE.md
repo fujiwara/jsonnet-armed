@@ -68,6 +68,34 @@ func compareJSON(t *testing.T, got, want string) {
   - At least one integration test case in `integration_test.go` to verify end-to-end functionality
   - If function reads files, create test fixtures in `testdata/` directory
 
+## Development Workflow
+
+### Go Module Management
+- Always run `go mod tidy` after adding or updating dependencies
+- This ensures go.mod and go.sum are properly synchronized
+- Example workflow:
+  ```bash
+  go get github.com/some/package
+  go mod tidy
+  ```
+
+### Code Formatting
+- Always run `go fmt ./...` before committing code
+- This ensures consistent code formatting across the project
+- Make it a habit to format before every commit
+
+### Git Commit Best Practices
+- Use `git add <file>` to add specific files instead of `git add -A`
+- This prevents accidentally committing unintended changes
+- Review each file before adding:
+  ```bash
+  git status
+  git add functions/new_function.go
+  git add functions/new_function_test.go
+  git add go.mod go.sum
+  git commit -m "Add new function"
+  ```
+
 ## Development Commands
 
 ### Build
