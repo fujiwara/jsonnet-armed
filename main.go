@@ -46,17 +46,12 @@ func (cli *CLI) run(ctx context.Context) error {
 		defer cancel()
 	}
 
-	// Set the context for exec functions so they can be cancelled when CLI times out
-	functions.SetExecContext(ctx)
-	// Ensure context is reset when CLI execution completes
-	defer functions.ResetExecContext()
-
 	// Create a channel to signal completion
 	resultCh := make(chan result, 1)
 
 	// Run evaluation and output in goroutine to enable timeout
 	go func() {
-		jsonStr, err := cli.evaluate()
+		jsonStr, err := cli.evaluate(ctx)
 		if err != nil {
 			resultCh <- result{jsonStr: "", err: err}
 			return
@@ -85,16 +80,17 @@ type result struct {
 	err     error
 }
 
-func (cli *CLI) evaluate() (string, error) {
+func (cli *CLI) evaluate(ctx context.Context) (string, error) {
 	vm := jsonnet.MakeVM()
 
-	// Add importer for armed.libsonnet
-	vm.Importer(&ArmedImporter{})
-
 	// Register native functions
-	for _, f := range functions.AllFunctions() {
+	funcs := functions.GenerateAllFunctions(ctx)
+	for _, f := range funcs {
 		vm.NativeFunction(f)
 	}
+
+	// Add importer for armed.libsonnet
+	vm.Importer(&ArmedImporter{funcs: funcs})
 
 	for k, v := range cli.ExtStr {
 		vm.ExtVar(k, v)
@@ -132,12 +128,14 @@ func (cli *CLI) writeOutput(jsonStr string) error {
 }
 
 // ArmedImporter provides virtual file system for armed.libsonnet
-type ArmedImporter struct{}
+type ArmedImporter struct {
+	funcs []*jsonnet.NativeFunction
+}
 
 func (ai *ArmedImporter) Import(importedFrom, importedPath string) (contents jsonnet.Contents, foundAt string, err error) {
 	if importedPath == "armed.libsonnet" {
 		// Generate the library content dynamically
-		content := functions.GenerateArmedLib()
+		content := functions.GenerateArmedLib(ai.funcs)
 		return jsonnet.MakeContents(content), "armed.libsonnet", nil
 	}
 

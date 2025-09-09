@@ -1,6 +1,7 @@
 package functions_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/fujiwara/jsonnet-armed/functions"
@@ -47,8 +48,8 @@ func getTimeFunction(name string) (func([]any) (any, error), error) {
 	return f.Func, nil
 }
 
-func getExecFunction(name string) (func([]any) (any, error), error) {
-	f, ok := functions.ExecFunctions[name]
+func getExecFunction(ctx context.Context, name string) (func([]any) (any, error), error) {
+	f, ok := functions.GenerateExecFunctions(ctx)[name]
 	if !ok {
 		return nil, fmt.Errorf("exec function %s not found", name)
 	}

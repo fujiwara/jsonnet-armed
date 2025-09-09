@@ -10,7 +10,7 @@ import (
 )
 
 func TestExecFunction(t *testing.T) {
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(t.Context(), "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestExecFunction(t *testing.T) {
 }
 
 func TestExecWithEnvFunction(t *testing.T) {
-	execWithEnvFunc, err := getExecFunction("exec_with_env")
+	execWithEnvFunc, err := getExecFunction(t.Context(), "exec_with_env")
 	if err != nil {
 		t.Fatalf("failed to get exec_with_env function: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestExecTimeout(t *testing.T) {
 	// Set shorter timeout for testing
 	functions.DefaultExecTimeout = 3 * time.Second
 
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(t.Context(), "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestExecTimeoutSIGKILL(t *testing.T) {
 	// Set shorter timeout for testing
 	functions.DefaultExecTimeout = 3 * time.Second
 
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(t.Context(), "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}

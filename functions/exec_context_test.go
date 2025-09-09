@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/fujiwara/jsonnet-armed/functions"
 )
 
 func TestExecContextCancellation(t *testing.T) {
@@ -16,10 +14,7 @@ func TestExecContextCancellation(t *testing.T) {
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Set the context for exec functions
-	functions.SetExecContext(ctx)
-
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(ctx, "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}
@@ -62,10 +57,7 @@ func TestExecContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Set the context for exec functions
-	functions.SetExecContext(ctx)
-
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(ctx, "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}

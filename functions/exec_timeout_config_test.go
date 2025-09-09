@@ -22,7 +22,7 @@ func TestCustomExecTimeout(t *testing.T) {
 	// Set a short timeout for testing
 	functions.DefaultExecTimeout = 2 * time.Second
 
-	execFunc, err := getExecFunction("exec")
+	execFunc, err := getExecFunction(t.Context(), "exec")
 	if err != nil {
 		t.Fatalf("failed to get exec function: %v", err)
 	}
