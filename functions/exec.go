@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"sync"
 	"time"
 
 	"github.com/google/go-jsonnet"
@@ -14,115 +13,84 @@ import (
 )
 
 var (
-	// Global context for exec functions
-	execContextMu sync.RWMutex
-	execContext   context.Context = context.Background()
-
 	// DefaultExecTimeout is the default timeout for exec commands
 	DefaultExecTimeout = 30 * time.Second
 )
 
-// SetExecContext sets the parent context for exec functions
-// This allows CLI timeout to be propagated to exec commands
-func SetExecContext(ctx context.Context) {
-	execContextMu.Lock()
-	defer execContextMu.Unlock()
-	execContext = ctx
-}
-
-// ResetExecContext resets the exec context to Background
-// This should be called when CLI execution completes
-func ResetExecContext() {
-	execContextMu.Lock()
-	defer execContextMu.Unlock()
-	execContext = context.Background()
-}
-
-// getExecContext returns the current exec context
-func getExecContext() context.Context {
-	execContextMu.RLock()
-	defer execContextMu.RUnlock()
-	return execContext
-}
-
-var ExecFunctions = map[string]*jsonnet.NativeFunction{
-	"exec": {
-		Params: []ast.Identifier{"command", "args"},
-		Func: func(args []any) (any, error) {
-			command, ok := args[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("exec: command must be a string")
-			}
-
-			var cmdArgs []string
-			if args[1] != nil {
-				argsSlice, ok := args[1].([]any)
+func GenerateExecFunctions(ctx context.Context) map[string]*jsonnet.NativeFunction {
+	funcs := map[string]*jsonnet.NativeFunction{
+		"exec": {
+			Params: []ast.Identifier{"command", "args"},
+			Func: func(args []any) (any, error) {
+				command, ok := args[0].(string)
 				if !ok {
-					return nil, fmt.Errorf("exec: args must be an array")
+					return nil, fmt.Errorf("exec: command must be a string")
 				}
-				cmdArgs = make([]string, len(argsSlice))
-				for i, arg := range argsSlice {
-					argStr, ok := arg.(string)
+				var cmdArgs []string
+				if args[1] != nil {
+					argsSlice, ok := args[1].([]any)
 					if !ok {
-						return nil, fmt.Errorf("exec: all arguments must be strings")
+						return nil, fmt.Errorf("exec: args must be an array")
 					}
-					cmdArgs[i] = argStr
+					cmdArgs = make([]string, len(argsSlice))
+					for i, arg := range argsSlice {
+						argStr, ok := arg.(string)
+						if !ok {
+							return nil, fmt.Errorf("exec: all arguments must be strings")
+						}
+						cmdArgs[i] = argStr
+					}
 				}
-			}
-
-			return executeCommand(command, cmdArgs, nil)
+				return executeCommand(ctx, command, cmdArgs, nil)
+			},
 		},
-	},
-	"exec_with_env": {
-		Params: []ast.Identifier{"command", "args", "env_vars"},
-		Func: func(args []any) (any, error) {
-			command, ok := args[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("exec_with_env: command must be a string")
-			}
-
-			var cmdArgs []string
-			if args[1] != nil {
-				argsSlice, ok := args[1].([]any)
+		"exec_with_env": {
+			Params: []ast.Identifier{"command", "args", "env_vars"},
+			Func: func(args []any) (any, error) {
+				command, ok := args[0].(string)
 				if !ok {
-					return nil, fmt.Errorf("exec_with_env: args must be an array")
+					return nil, fmt.Errorf("exec_with_env: command must be a string")
 				}
-				cmdArgs = make([]string, len(argsSlice))
-				for i, arg := range argsSlice {
-					argStr, ok := arg.(string)
+				var cmdArgs []string
+				if args[1] != nil {
+					argsSlice, ok := args[1].([]any)
 					if !ok {
-						return nil, fmt.Errorf("exec_with_env: all arguments must be strings")
+						return nil, fmt.Errorf("exec_with_env: args must be an array")
 					}
-					cmdArgs[i] = argStr
+					cmdArgs = make([]string, len(argsSlice))
+					for i, arg := range argsSlice {
+						argStr, ok := arg.(string)
+						if !ok {
+							return nil, fmt.Errorf("exec_with_env: all arguments must be strings")
+						}
+						cmdArgs[i] = argStr
+					}
 				}
-			}
-
-			var envVars []string
-			if args[2] != nil {
-				envMap, ok := args[2].(map[string]any)
-				if !ok {
-					return nil, fmt.Errorf("exec_with_env: env_vars must be an object")
-				}
-				for key, value := range envMap {
-					valueStr, ok := value.(string)
+				var envVars []string
+				if args[2] != nil {
+					envMap, ok := args[2].(map[string]any)
 					if !ok {
-						return nil, fmt.Errorf("exec_with_env: environment variable values must be strings")
+						return nil, fmt.Errorf("exec_with_env: env_vars must be an object")
 					}
-					envVars = append(envVars, fmt.Sprintf("%s=%s", key, valueStr))
+					for key, value := range envMap {
+						valueStr, ok := value.(string)
+						if !ok {
+							return nil, fmt.Errorf("exec_with_env: environment variable values must be strings")
+						}
+						envVars = append(envVars, fmt.Sprintf("%s=%s", key, valueStr))
+					}
 				}
-			}
-
-			return executeCommand(command, cmdArgs, envVars)
+				return executeCommand(ctx, command, cmdArgs, envVars)
+			},
 		},
-	},
+	}
+	initializeFunctionMap(funcs)
+	return funcs
 }
 
-func executeCommand(command string, args []string, envVars []string) (map[string]any, error) {
-	// Use parent context if available, otherwise use Background
-	parentCtx := getExecContext()
-
+func executeCommand(ctx context.Context, command string, args []string, envVars []string) (map[string]any, error) {
 	// Add timeout to the parent context
-	ctx, cancel := context.WithTimeout(parentCtx, DefaultExecTimeout)
+	ctx, cancel := context.WithTimeout(ctx, DefaultExecTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -164,8 +132,4 @@ func executeCommand(command string, args []string, envVars []string) (map[string
 		"stderr":    stderr.String(),
 		"exit_code": exitCode,
 	}, nil
-}
-
-func init() {
-	initializeFunctionMap(ExecFunctions)
 }

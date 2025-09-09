@@ -1,13 +1,14 @@
 package functions
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/go-jsonnet"
 )
 
-// AllFunctions returns all native functions in one slice
-func AllFunctions() []*jsonnet.NativeFunction {
+func GenerateAllFunctions(ctx context.Context) []*jsonnet.NativeFunction {
 	var all []*jsonnet.NativeFunction
 
 	// Add functions from maps
@@ -26,7 +27,7 @@ func AllFunctions() []*jsonnet.NativeFunction {
 	for _, f := range TimeFunctions {
 		all = append(all, f)
 	}
-	for _, f := range ExecFunctions {
+	for _, f := range GenerateExecFunctions(ctx) {
 		all = append(all, f)
 	}
 
@@ -34,13 +35,13 @@ func AllFunctions() []*jsonnet.NativeFunction {
 }
 
 // GenerateArmedLib returns the armed library as a string
-func GenerateArmedLib() string {
+func GenerateArmedLib(funcs []*jsonnet.NativeFunction) string {
 	var lines []string
 	lines = append(lines, "{")
 
 	// Add all function definitions
-	for _, f := range AllFunctions() {
-		lines = append(lines, "  "+f.Name+": std.native('"+f.Name+"'),")
+	for _, f := range funcs {
+		lines = append(lines, fmt.Sprintf("  %s: std.native('%s'),", f.Name, f.Name))
 	}
 
 	lines = append(lines, "}")

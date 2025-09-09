@@ -6,7 +6,8 @@ import (
 )
 
 func TestGenerateArmedLib(t *testing.T) {
-	result := GenerateArmedLib()
+	funcs := GenerateAllFunctions(t.Context())
+	result := GenerateArmedLib(funcs)
 
 	// Verify it contains expected function definitions
 	expectedFunctions := []string{
