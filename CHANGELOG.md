@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.6](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.5...v0.0.6) - 2025-09-09
+- Refactor exec functions to use explicit context passing by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/23
+
 ## [v0.0.5](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.4...v0.0.5) - 2025-09-08
 - Add env_parse native function by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/21
 
