@@ -1,10 +1,13 @@
 package armed
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/alecthomas/kong"
 	"github.com/fujiwara/jsonnet-armed/functions"
@@ -121,10 +124,105 @@ func (cli *CLI) evaluate(ctx context.Context) (string, error) {
 
 func (cli *CLI) writeOutput(jsonStr string) error {
 	if cli.OutputFile != "" {
-		return os.WriteFile(cli.OutputFile, []byte(jsonStr), 0644)
+		data := []byte(jsonStr)
+
+		// Check if content has changed when WriteIfChanged is enabled
+		if cli.WriteIfChanged && shouldSkipWrite(cli.OutputFile, data) {
+			return nil
+		}
+
+		return writeFileAtomic(cli.OutputFile, data, 0644)
 	}
 	_, err := io.WriteString(cli.writer, jsonStr)
 	return err
+}
+
+// shouldSkipWrite checks if the file write should be skipped because content hasn't changed
+func shouldSkipWrite(filename string, newData []byte) bool {
+	// Check if file exists
+	info, err := os.Stat(filename)
+	if err != nil {
+		// File doesn't exist, need to write
+		return false
+	}
+
+	// Compare file sizes first
+	if info.Size() != int64(len(newData)) {
+		// Different size, content has changed
+		return false
+	}
+
+	// Size is the same, compare SHA256 hashes
+	// Calculate hash of existing file using streaming
+	file, err := os.Open(filename)
+	if err != nil {
+		// Error opening file, write anyway
+		return false
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		// Error reading file, write anyway
+		return false
+	}
+	existingHash := hasher.Sum(nil)
+
+	// Calculate hash of new data
+	newHash := sha256.Sum256(newData)
+
+	return bytes.Equal(existingHash, newHash[:])
+}
+
+// writeFileAtomic writes data to the named file atomically.
+// It writes to a temporary file first, then renames it to the target file.
+func writeFileAtomic(filename string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(filename)
+	base := filepath.Base(filename)
+
+	// Create a temporary file in the same directory
+	tmpfile, err := os.CreateTemp(dir, base+".tmp")
+	if err != nil {
+		return err
+	}
+	tmpname := tmpfile.Name()
+
+	// Clean up the temporary file if something goes wrong
+	defer func() {
+		if tmpfile != nil {
+			tmpfile.Close()
+			os.Remove(tmpname)
+		}
+	}()
+
+	// Write data to the temporary file
+	if _, err := tmpfile.Write(data); err != nil {
+		return err
+	}
+
+	// Sync to ensure data is written to disk
+	if err := tmpfile.Sync(); err != nil {
+		return err
+	}
+
+	// Set the correct permissions
+	if err := tmpfile.Chmod(perm); err != nil {
+		return err
+	}
+
+	// Close the file before renaming
+	if err := tmpfile.Close(); err != nil {
+		return err
+	}
+	tmpfile = nil // Prevent defer from removing the file
+
+	// Atomically replace the target file
+	if err := os.Rename(tmpname, filename); err != nil {
+		os.Remove(tmpname)
+		return err
+	}
+
+	return nil
 }
 
 // ArmedImporter provides virtual file system for armed.libsonnet

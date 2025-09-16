@@ -7,7 +7,7 @@ clean:
 	rm -rf jsonnet-armed dist/
 
 test:
-	go test -v ./...
+	go test -race -v ./...
 
 install:
 	go install github.com/fujiwara/jsonnet-armed/cmd/jsonnet-armed

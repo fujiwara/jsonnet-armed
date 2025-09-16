@@ -20,19 +20,22 @@ go install github.com/fujiwara/jsonnet-armed/cmd/jsonnet-armed@latest
 
 ## Usage
 
+### Command Line Usage
+
 ```bash
 jsonnet-armed [options] <jsonnet-file>
 ```
 
-### Options
+#### Options
 
-- `-o, --output-file <file>`: Write output to file instead of stdout
+- `-o, --output-file <file>`: Write output to file instead of stdout (uses atomic writes to prevent corruption)
+- `--write-if-changed`: Write output file only if content has changed (compares using file size and SHA256 hash)
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
 - `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
 - `-v, --version`: Show version and exit
 
-### Examples
+#### Examples
 
 Basic usage:
 ```bash
@@ -56,6 +59,9 @@ jsonnet-armed -t 30s config.jsonnet
 
 # Read from stdin with timeout
 echo '{ value: "test" }' | jsonnet-armed -t 10s -
+
+# Write only if content has changed (useful for build tools)
+jsonnet-armed --write-if-changed -o output.json config.jsonnet
 ```
 
 Example Jsonnet file using external variables and native functions:
@@ -109,6 +115,92 @@ local exec_with_env = std.native("exec_with_env");
     platform: if uname.exit_code == 0 then std.strReplace(uname.stdout, "\n", "") else "unknown",
     uptime: if uptime.exit_code == 0 then std.strReplace(uptime.stdout, "\n", "") else "unknown"
   }
+}
+```
+
+### Library Usage
+
+jsonnet-armed can be embedded in your Go application as a configuration loader.
+
+```go
+package main
+
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    
+    armed "github.com/fujiwara/jsonnet-armed"
+)
+
+func main() {
+    // Load configuration from Jsonnet file
+    config, err := LoadConfig("config.jsonnet", map[string]string{
+        "env": "production",
+        "region": "us-west-2",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("Configuration loaded:", config)
+}
+
+func LoadConfig(filename string, vars map[string]string) (map[string]interface{}, error) {
+    // Create CLI instance
+    cli := &armed.CLI{
+        Filename: filename,
+        ExtStr:   vars,
+    }
+    
+    // Capture output in buffer
+    var buf bytes.Buffer
+    cli.SetWriter(&buf)
+    
+    // Execute with context (supports timeout and cancellation)
+    ctx := context.Background()
+    if err := cli.Run(ctx); err != nil {
+        return nil, err
+    }
+    
+    // Parse JSON output
+    var result map[string]interface{}
+    if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+        return nil, err
+    }
+    
+    return result, nil
+}
+```
+
+You can also use timeout and external code variables:
+
+```go
+import "time"
+
+// With timeout
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+cli := &armed.CLI{
+    Filename: "config.jsonnet",
+    ExtStr: map[string]string{
+        "env": "production",
+    },
+    ExtCode: map[string]string{
+        "replicas": "3",
+        "debug": "true",
+    },
+    Timeout: 30 * time.Second,  // Optional: CLI-level timeout
+}
+
+var buf bytes.Buffer
+cli.SetWriter(&buf)
+
+if err := cli.Run(ctx); err != nil {
+    // Handle error
 }
 ```
 
