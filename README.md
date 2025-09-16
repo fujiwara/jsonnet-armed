@@ -29,6 +29,7 @@ jsonnet-armed [options] <jsonnet-file>
 #### Options
 
 - `-o, --output-file <file>`: Write output to file instead of stdout (uses atomic writes to prevent corruption)
+- `--write-if-changed`: Write output file only if content has changed (compares using file size and SHA256 hash)
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
 - `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
@@ -58,6 +59,9 @@ jsonnet-armed -t 30s config.jsonnet
 
 # Read from stdin with timeout
 echo '{ value: "test" }' | jsonnet-armed -t 10s -
+
+# Write only if content has changed (useful for build tools)
+jsonnet-armed --write-if-changed -o output.json config.jsonnet
 ```
 
 Example Jsonnet file using external variables and native functions:

@@ -664,6 +664,248 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 }
 
 // TestAtomicFileWrite tests that file writing is atomic
+// TestWriteIfChanged tests the --write-if-changed functionality
+func TestWriteIfChanged(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	t.Run("write new file", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "new.jsonnet")
+		outputFile := filepath.Join(tmpDir, "new_output.json")
+
+		jsonnet := `{"test": "new file"}`
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		cli := &armed.CLI{
+			Filename:       jsonnetFile,
+			OutputFile:     outputFile,
+			WriteIfChanged: true,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// File should exist
+		if _, err := os.Stat(outputFile); err != nil {
+			t.Errorf("output file should exist: %v", err)
+		}
+	})
+
+	t.Run("skip unchanged file", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "unchanged.jsonnet")
+		outputFile := filepath.Join(tmpDir, "unchanged_output.json")
+
+		jsonnet := `{"test": "unchanged"}`
+		// Use the exact format that jsonnet produces (with newline)
+		expectedOutput := `{
+   "test": "unchanged"
+}
+`
+
+		// Write jsonnet file
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		// Write existing output file
+		if err := os.WriteFile(outputFile, []byte(expectedOutput), 0644); err != nil {
+			t.Fatalf("failed to write output file: %v", err)
+		}
+
+		// Get original modification time
+		originalInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+		originalModTime := originalInfo.ModTime()
+
+		// Sleep to ensure time difference
+		time.Sleep(10 * time.Millisecond)
+
+		cli := &armed.CLI{
+			Filename:       jsonnetFile,
+			OutputFile:     outputFile,
+			WriteIfChanged: true,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Check modification time hasn't changed
+		newInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+
+		if !newInfo.ModTime().Equal(originalModTime) {
+			t.Errorf("file should not have been modified: original=%v, new=%v",
+				originalModTime, newInfo.ModTime())
+		}
+	})
+
+	t.Run("update changed file", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "changed.jsonnet")
+		outputFile := filepath.Join(tmpDir, "changed_output.json")
+
+		jsonnet := `{"test": "changed", "value": 42}`
+		oldOutput := `{"test":"old","value":1}`
+
+		// Write jsonnet file
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		// Write existing output file with different content
+		if err := os.WriteFile(outputFile, []byte(oldOutput), 0644); err != nil {
+			t.Fatalf("failed to write output file: %v", err)
+		}
+
+		// Get original modification time
+		originalInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+		originalModTime := originalInfo.ModTime()
+
+		// Sleep to ensure time difference
+		time.Sleep(10 * time.Millisecond)
+
+		cli := &armed.CLI{
+			Filename:       jsonnetFile,
+			OutputFile:     outputFile,
+			WriteIfChanged: true,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Check modification time has changed
+		newInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+
+		if newInfo.ModTime().Equal(originalModTime) {
+			t.Error("file should have been modified")
+		}
+
+		// Verify new content
+		content, err := os.ReadFile(outputFile)
+		if err != nil {
+			t.Fatalf("failed to read output file: %v", err)
+		}
+
+		var result map[string]interface{}
+		if err := json.Unmarshal(content, &result); err != nil {
+			t.Errorf("invalid JSON: %v", err)
+		}
+
+		if result["test"] != "changed" || result["value"] != float64(42) {
+			t.Errorf("unexpected content: %v", result)
+		}
+	})
+
+	t.Run("update file with different size", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "size.jsonnet")
+		outputFile := filepath.Join(tmpDir, "size_output.json")
+
+		jsonnet := `{"test": "new content with different size"}`
+		oldOutput := `{"test":"old"}`
+
+		// Write jsonnet file
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		// Write existing output file with different size
+		if err := os.WriteFile(outputFile, []byte(oldOutput), 0644); err != nil {
+			t.Fatalf("failed to write output file: %v", err)
+		}
+
+		cli := &armed.CLI{
+			Filename:       jsonnetFile,
+			OutputFile:     outputFile,
+			WriteIfChanged: true,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Verify new content
+		content, err := os.ReadFile(outputFile)
+		if err != nil {
+			t.Fatalf("failed to read output file: %v", err)
+		}
+
+		var result map[string]interface{}
+		if err := json.Unmarshal(content, &result); err != nil {
+			t.Errorf("invalid JSON: %v", err)
+		}
+
+		if result["test"] != "new content with different size" {
+			t.Errorf("unexpected content: %v", result)
+		}
+	})
+
+	t.Run("disabled by default", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "default.jsonnet")
+		outputFile := filepath.Join(tmpDir, "default_output.json")
+
+		jsonnet := `{"test": "default"}`
+		// Use the exact format that jsonnet produces (with newline)
+		expectedOutput := `{
+   "test": "default"
+}
+`
+
+		// Write jsonnet file
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		// Write existing output file
+		if err := os.WriteFile(outputFile, []byte(expectedOutput), 0644); err != nil {
+			t.Fatalf("failed to write output file: %v", err)
+		}
+
+		// Get original modification time
+		originalInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+		originalModTime := originalInfo.ModTime()
+
+		// Sleep to ensure time difference
+		time.Sleep(10 * time.Millisecond)
+
+		cli := &armed.CLI{
+			Filename:       jsonnetFile,
+			OutputFile:     outputFile,
+			WriteIfChanged: false, // Explicitly disabled (default)
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Check modification time HAS changed (always writes when disabled)
+		newInfo, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+
+		if newInfo.ModTime().Equal(originalModTime) {
+			t.Error("file should have been modified when WriteIfChanged is disabled")
+		}
+	})
+}
+
 func TestAtomicFileWrite(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
