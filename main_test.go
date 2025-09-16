@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -912,33 +913,32 @@ func TestAtomicFileWrite(t *testing.T) {
 
 	// Test concurrent writes to ensure atomicity
 	t.Run("concurrent writes", func(t *testing.T) {
-		jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
 		outputFile := filepath.Join(tmpDir, "concurrent_output.json")
 
-		// Create different jsonnet contents for each writer
+		// Create different jsonnet files for each writer to avoid race condition
+		jsonnetFiles := make([]string, 3)
 		contents := []string{
 			`{"writer": 1, "data": "first"}`,
 			`{"writer": 2, "data": "second"}`,
 			`{"writer": 3, "data": "third"}`,
 		}
 
-		// Write initial jsonnet file
-		if err := os.WriteFile(jsonnetFile, []byte(contents[0]), 0644); err != nil {
-			t.Fatalf("failed to write jsonnet file: %v", err)
+		for i := range jsonnetFiles {
+			jsonnetFiles[i] = filepath.Join(tmpDir, fmt.Sprintf("test_%d.jsonnet", i))
+			if err := os.WriteFile(jsonnetFiles[i], []byte(contents[i]), 0644); err != nil {
+				t.Fatalf("failed to write jsonnet file: %v", err)
+			}
 		}
 
-		// Run concurrent writes
+		// Run concurrent writes to the same output file
 		var wg sync.WaitGroup
 		for i := 0; i < 3; i++ {
 			wg.Add(1)
 			go func(index int) {
 				defer wg.Done()
 
-				// Update jsonnet file
-				os.WriteFile(jsonnetFile, []byte(contents[index]), 0644)
-
 				cli := &armed.CLI{
-					Filename:   jsonnetFile,
+					Filename:   jsonnetFiles[index],
 					OutputFile: outputFile,
 				}
 
