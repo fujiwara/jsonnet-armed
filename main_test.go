@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -660,4 +661,162 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAtomicFileWrite tests that file writing is atomic
+func TestAtomicFileWrite(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Test concurrent writes to ensure atomicity
+	t.Run("concurrent writes", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+		outputFile := filepath.Join(tmpDir, "concurrent_output.json")
+
+		// Create different jsonnet contents for each writer
+		contents := []string{
+			`{"writer": 1, "data": "first"}`,
+			`{"writer": 2, "data": "second"}`,
+			`{"writer": 3, "data": "third"}`,
+		}
+
+		// Write initial jsonnet file
+		if err := os.WriteFile(jsonnetFile, []byte(contents[0]), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		// Run concurrent writes
+		var wg sync.WaitGroup
+		for i := 0; i < 3; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+
+				// Update jsonnet file
+				os.WriteFile(jsonnetFile, []byte(contents[index]), 0644)
+
+				cli := &armed.CLI{
+					Filename:   jsonnetFile,
+					OutputFile: outputFile,
+				}
+
+				if err := cli.Run(ctx); err != nil {
+					t.Logf("writer %d error: %v", index, err)
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Verify the output file exists and is valid JSON
+		data, err := os.ReadFile(outputFile)
+		if err != nil {
+			t.Fatalf("failed to read output file: %v", err)
+		}
+
+		var result map[string]interface{}
+		if err := json.Unmarshal(data, &result); err != nil {
+			t.Errorf("output file contains invalid JSON: %v\nContent: %s", err, string(data))
+		}
+
+		// The file should contain complete JSON from one of the writers
+		if writer, ok := result["writer"].(float64); ok {
+			if writer < 1 || writer > 3 {
+				t.Errorf("unexpected writer value: %v", writer)
+			}
+		} else {
+			t.Errorf("writer field not found or not a number")
+		}
+	})
+
+	// Test that intermediate temporary files are cleaned up
+	t.Run("temp file cleanup", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "test_cleanup.jsonnet")
+		outputFile := filepath.Join(tmpDir, "cleanup_output.json")
+
+		jsonnet := `{"test": "cleanup"}`
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		cli := &armed.CLI{
+			Filename:   jsonnetFile,
+			OutputFile: outputFile,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Check that no .tmp files remain
+		entries, err := os.ReadDir(tmpDir)
+		if err != nil {
+			t.Fatalf("failed to read directory: %v", err)
+		}
+
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), ".tmp") {
+				t.Errorf("temporary file not cleaned up: %s", entry.Name())
+			}
+		}
+	})
+
+	// Test that file permissions are preserved
+	t.Run("preserve permissions", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "test_perms.jsonnet")
+		outputFile := filepath.Join(tmpDir, "perms_output.json")
+
+		jsonnet := `{"test": "permissions"}`
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		cli := &armed.CLI{
+			Filename:   jsonnetFile,
+			OutputFile: outputFile,
+		}
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Check file permissions
+		info, err := os.Stat(outputFile)
+		if err != nil {
+			t.Fatalf("failed to stat output file: %v", err)
+		}
+
+		// Should have 0644 permissions
+		expectedMode := os.FileMode(0644)
+		if info.Mode().Perm() != expectedMode {
+			t.Errorf("unexpected file permissions: got %v, want %v", info.Mode().Perm(), expectedMode)
+		}
+	})
+
+	// Test error handling during write
+	t.Run("write error handling", func(t *testing.T) {
+		jsonnetFile := filepath.Join(tmpDir, "test_error.jsonnet")
+		// Try to write to a directory that doesn't exist
+		outputFile := filepath.Join(tmpDir, "nonexistent", "subdir", "output.json")
+
+		jsonnet := `{"test": "error"}`
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnet), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
+		}
+
+		cli := &armed.CLI{
+			Filename:   jsonnetFile,
+			OutputFile: outputFile,
+		}
+
+		err := cli.Run(ctx)
+		if err == nil {
+			t.Fatal("expected error for non-existent directory, got nil")
+		}
+
+		// The error should mention the directory issue
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
 }
