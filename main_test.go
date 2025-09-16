@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -915,30 +914,25 @@ func TestAtomicFileWrite(t *testing.T) {
 	t.Run("concurrent writes", func(t *testing.T) {
 		outputFile := filepath.Join(tmpDir, "concurrent_output.json")
 
-		// Create different jsonnet files for each writer to avoid race condition
-		jsonnetFiles := make([]string, 3)
-		contents := []string{
-			`{"writer": 1, "data": "first"}`,
-			`{"writer": 2, "data": "second"}`,
-			`{"writer": 3, "data": "third"}`,
+		// Use the same jsonnet content for all writers to test true concurrency
+		jsonnetFile := filepath.Join(tmpDir, "shared.jsonnet")
+		jsonnetContent := `{"message": "atomic test", "timestamp": std.native("now")()}`
+
+		if err := os.WriteFile(jsonnetFile, []byte(jsonnetContent), 0644); err != nil {
+			t.Fatalf("failed to write jsonnet file: %v", err)
 		}
 
-		for i := range jsonnetFiles {
-			jsonnetFiles[i] = filepath.Join(tmpDir, fmt.Sprintf("test_%d.jsonnet", i))
-			if err := os.WriteFile(jsonnetFiles[i], []byte(contents[i]), 0644); err != nil {
-				t.Fatalf("failed to write jsonnet file: %v", err)
-			}
-		}
-
-		// Run concurrent writes to the same output file
+		// Run concurrent writes to the same output file with same input
 		var wg sync.WaitGroup
-		for i := 0; i < 3; i++ {
+		const numWriters = 5
+
+		for i := 0; i < numWriters; i++ {
 			wg.Add(1)
 			go func(index int) {
 				defer wg.Done()
 
 				cli := &armed.CLI{
-					Filename:   jsonnetFiles[index],
+					Filename:   jsonnetFile,
 					OutputFile: outputFile,
 				}
 
@@ -951,6 +945,8 @@ func TestAtomicFileWrite(t *testing.T) {
 		wg.Wait()
 
 		// Verify the output file exists and is valid JSON
+		// The key test is that we get a complete, valid JSON file
+		// (not a corrupted/partial file from concurrent writes)
 		data, err := os.ReadFile(outputFile)
 		if err != nil {
 			t.Fatalf("failed to read output file: %v", err)
@@ -961,13 +957,13 @@ func TestAtomicFileWrite(t *testing.T) {
 			t.Errorf("output file contains invalid JSON: %v\nContent: %s", err, string(data))
 		}
 
-		// The file should contain complete JSON from one of the writers
-		if writer, ok := result["writer"].(float64); ok {
-			if writer < 1 || writer > 3 {
-				t.Errorf("unexpected writer value: %v", writer)
-			}
-		} else {
-			t.Errorf("writer field not found or not a number")
+		// Verify expected structure exists
+		if message, ok := result["message"].(string); !ok || message != "atomic test" {
+			t.Errorf("unexpected message field: %v", result["message"])
+		}
+
+		if _, ok := result["timestamp"].(float64); !ok {
+			t.Errorf("timestamp field missing or not a number: %v", result["timestamp"])
 		}
 	})
 
