@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.7](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.6...v0.0.7) - 2025-09-16
+- feat: Implement atomic file writing with write-if-changed option by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/25
+
 ## [v0.0.6](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.5...v0.0.6) - 2025-09-09
 - Refactor exec functions to use explicit context passing by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/23
 
