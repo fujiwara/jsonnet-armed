@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -45,7 +46,7 @@ func (cli *CLI) run(ctx context.Context) error {
 	// Initialize cache if enabled
 	var cache *Cache
 	if cli.Cache > 0 {
-		cache = NewCache(cli.Cache)
+		cache = NewCache(cli.Cache, cli.Stale)
 		// Clean expired cache entries (best effort)
 		go cache.Clean()
 	}
@@ -111,28 +112,50 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 	}
 
 	// Try to get from cache if enabled
+	var staleContent string
 	if cache != nil {
 		cacheKey, err := cache.GenerateCacheKey(cli, contentBytes)
-		if err == nil {
-			if cachedResult, found := cache.Get(cacheKey); found {
-				// Use cached result
-				err = cli.writeOutput(cachedResult)
-				return result{jsonStr: cachedResult, err: err}
+		if err != nil {
+			slog.Warn("Failed to generate cache key",
+				"error", err.Error(),
+				"filename", cli.Filename)
+		} else {
+			if cachedResult, isStale, exists := cache.GetWithStale(cacheKey); exists {
+				if !isStale {
+					// Use fresh cached result
+					err = cli.writeOutput(cachedResult)
+					return result{jsonStr: cachedResult, err: err}
+				}
+				// Store stale content for potential fallback
+				staleContent = cachedResult
 			}
+			// Store cache key for later use
+			cli.cacheKey = cacheKey
 		}
-		// Store cache key for later use
-		cli.cacheKey = cacheKey
 	}
 
 	jsonStr, err := cli.evaluate(ctx, inputContent, isStdin)
 	if err != nil {
+		// If evaluation failed and we have stale cache, use it
+		if staleContent != "" {
+			slog.Warn("Evaluation failed, using stale cache",
+				"error", err.Error(),
+				"filename", cli.Filename)
+			err = cli.writeOutput(staleContent)
+			return result{jsonStr: staleContent, err: err}
+		}
 		return result{jsonStr: "", err: err}
 	}
 
 	// Cache the result if cache is enabled
 	if cache != nil && cli.cacheKey != "" {
-		// Store in cache (best effort, ignore errors)
-		_ = cache.Set(cli.cacheKey, jsonStr)
+		// Store in cache (best effort, log errors)
+		if err := cache.Set(cli.cacheKey, jsonStr); err != nil {
+			slog.Warn("Failed to save cache",
+				"error", err.Error(),
+				"cache_key", cli.cacheKey[:8]+"...",
+				"filename", cli.Filename)
+		}
 	}
 
 	// Write output within the timeout scope
