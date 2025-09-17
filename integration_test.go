@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	armed "github.com/fujiwara/jsonnet-armed"
 	"github.com/google/go-cmp/cmp"
@@ -401,5 +402,85 @@ func normalizeTimestamps(m map[string]interface{}) {
 		} else if subMap, ok := v.(map[string]interface{}); ok {
 			normalizeTimestamps(subMap)
 		}
+	}
+}
+
+func TestIntegrationCache(t *testing.T) {
+	ctx := context.Background()
+
+	// Create a temporary file for testing
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "cache_test.jsonnet")
+	jsonnet := `{ timestamp: std.extVar("ts"), value: "cached" }`
+	if err := os.WriteFile(testFile, []byte(jsonnet), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// First evaluation with cache
+	cli1 := &armed.CLI{
+		Filename: testFile,
+		ExtStr:   map[string]string{"ts": "first"},
+		Cache:    time.Hour, // Long cache duration
+	}
+	var buf1 bytes.Buffer
+	cli1.SetWriter(&buf1)
+
+	if err := cli1.Run(ctx); err != nil {
+		t.Fatalf("First evaluation failed: %v", err)
+	}
+
+	firstResult := buf1.String()
+	var firstJSON map[string]interface{}
+	if err := json.Unmarshal([]byte(firstResult), &firstJSON); err != nil {
+		t.Fatalf("Failed to parse first result: %v", err)
+	}
+
+	// Verify first result
+	if firstJSON["timestamp"] != "first" {
+		t.Errorf("Expected timestamp 'first', got %v", firstJSON["timestamp"])
+	}
+
+	// Second evaluation with different extStr but same cache
+	cli2 := &armed.CLI{
+		Filename: testFile,
+		ExtStr:   map[string]string{"ts": "second"}, // Different value
+		Cache:    time.Hour,                         // Same cache duration
+	}
+	var buf2 bytes.Buffer
+	cli2.SetWriter(&buf2)
+
+	if err := cli2.Run(ctx); err != nil {
+		t.Fatalf("Second evaluation failed: %v", err)
+	}
+
+	secondResult := buf2.String()
+	var secondJSON map[string]interface{}
+	if err := json.Unmarshal([]byte(secondResult), &secondJSON); err != nil {
+		t.Fatalf("Failed to parse second result: %v", err)
+	}
+
+	// Different extStr should generate different cache key
+	if secondJSON["timestamp"] != "second" {
+		t.Errorf("Expected timestamp 'second', got %v", secondJSON["timestamp"])
+	}
+
+	// Third evaluation with same parameters as first (cache hit)
+	cli3 := &armed.CLI{
+		Filename: testFile,
+		ExtStr:   map[string]string{"ts": "first"}, // Same as first
+		Cache:    time.Hour,
+	}
+	var buf3 bytes.Buffer
+	cli3.SetWriter(&buf3)
+
+	if err := cli3.Run(ctx); err != nil {
+		t.Fatalf("Third evaluation failed: %v", err)
+	}
+
+	thirdResult := buf3.String()
+
+	// Should get exact same result as first (from cache)
+	if diff := cmp.Diff(firstResult, thirdResult); diff != "" {
+		t.Errorf("Cache hit should return identical result (-first +third):\n%s", diff)
 	}
 }

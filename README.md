@@ -33,6 +33,7 @@ jsonnet-armed [options] <jsonnet-file>
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
 - `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
+- `-c, --cache <duration>`: Cache evaluation results for specified duration (e.g., 5m, 1h)
 - `-v, --version`: Show version and exit
 
 #### Examples
@@ -62,7 +63,22 @@ echo '{ value: "test" }' | jsonnet-armed -t 10s -
 
 # Write only if content has changed (useful for build tools)
 jsonnet-armed --write-if-changed -o output.json config.jsonnet
+
+# Cache evaluation results for 5 minutes
+jsonnet-armed --cache 5m config.jsonnet
+
+# Cache for 1 hour with external variables
+jsonnet-armed --cache 1h -V env=production large-config.jsonnet
 ```
+
+#### Cache Feature
+
+The cache feature stores evaluation results to avoid redundant computations:
+
+- Cache key is generated from input file content, external variables, and output options
+- Cache files are stored in `$XDG_CACHE_HOME/jsonnet-armed/` or `$HOME/.cache/jsonnet-armed/`
+- Expired cache entries are automatically cleaned up
+- Useful for expensive computations or frequently accessed configurations
 
 Example Jsonnet file using external variables and native functions:
 ```jsonnet

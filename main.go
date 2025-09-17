@@ -42,6 +42,14 @@ func (cli *CLI) Run(ctx context.Context) error {
 }
 
 func (cli *CLI) run(ctx context.Context) error {
+	// Initialize cache if enabled
+	var cache *Cache
+	if cli.Cache > 0 {
+		cache = NewCache(cli.Cache)
+		// Clean expired cache entries (best effort)
+		go cache.Clean()
+	}
+
 	// Apply timeout if specified
 	if cli.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -52,17 +60,10 @@ func (cli *CLI) run(ctx context.Context) error {
 	// Create a channel to signal completion
 	resultCh := make(chan result, 1)
 
-	// Run evaluation and output in goroutine to enable timeout
+	// Run all operations in goroutine to enable timeout
 	go func() {
-		jsonStr, err := cli.evaluate(ctx)
-		if err != nil {
-			resultCh <- result{jsonStr: "", err: err}
-			return
-		}
-
-		// Write output within the timeout scope
-		err = cli.writeOutput(jsonStr)
-		resultCh <- result{jsonStr: jsonStr, err: err}
+		res := cli.processRequest(ctx, cache)
+		resultCh <- res
 	}()
 
 	// Wait for either completion or timeout
@@ -83,7 +84,63 @@ type result struct {
 	err     error
 }
 
-func (cli *CLI) evaluate(ctx context.Context) (string, error) {
+func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
+	// Read input content and determine if it's from stdin
+	var inputContent string
+	var isStdin bool
+	var contentBytes []byte
+	var err error
+
+	if cli.Filename == "-" {
+		// Read from stdin
+		contentBytes, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return result{jsonStr: "", err: fmt.Errorf("failed to read from stdin: %w", err)}
+		}
+		inputContent = string(contentBytes)
+		isStdin = true
+	} else {
+		// For files, we need content for cache key generation
+		if cache != nil {
+			contentBytes, err = os.ReadFile(cli.Filename)
+			if err != nil {
+				return result{jsonStr: "", err: fmt.Errorf("failed to read file: %w", err)}
+			}
+		}
+		isStdin = false
+	}
+
+	// Try to get from cache if enabled
+	if cache != nil {
+		cacheKey, err := cache.GenerateCacheKey(cli, contentBytes)
+		if err == nil {
+			if cachedResult, found := cache.Get(cacheKey); found {
+				// Use cached result
+				err = cli.writeOutput(cachedResult)
+				return result{jsonStr: cachedResult, err: err}
+			}
+		}
+		// Store cache key for later use
+		cli.cacheKey = cacheKey
+	}
+
+	jsonStr, err := cli.evaluate(ctx, inputContent, isStdin)
+	if err != nil {
+		return result{jsonStr: "", err: err}
+	}
+
+	// Cache the result if cache is enabled
+	if cache != nil && cli.cacheKey != "" {
+		// Store in cache (best effort, ignore errors)
+		_ = cache.Set(cli.cacheKey, jsonStr)
+	}
+
+	// Write output within the timeout scope
+	err = cli.writeOutput(jsonStr)
+	return result{jsonStr: jsonStr, err: err}
+}
+
+func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (string, error) {
 	vm := jsonnet.MakeVM()
 
 	// Register native functions
@@ -105,13 +162,8 @@ func (cli *CLI) evaluate(ctx context.Context) (string, error) {
 	var jsonStr string
 	var err error
 
-	if cli.Filename == "-" {
-		// Read from stdin
-		input, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return "", fmt.Errorf("failed to read from stdin: %w", err)
-		}
-		jsonStr, err = vm.EvaluateAnonymousSnippet("stdin", string(input))
+	if isStdin {
+		jsonStr, err = vm.EvaluateAnonymousSnippet("stdin", content)
 	} else {
 		jsonStr, err = vm.EvaluateFile(cli.Filename)
 	}
