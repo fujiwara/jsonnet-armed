@@ -9,6 +9,7 @@ A Jsonnet rendering tool with additional useful functions.
 - [Time functions](#time-functions) for current timestamp and formatting
 - [Base64 encoding functions](#base64-functions) (standard and URL-safe)
 - [Hash functions](#hash-functions) for cryptographic operations
+- [HTTP functions](#http-functions) for making HTTP requests
 - [External command execution](#external-command-execution) with timeout and cancellation
 - [File functions](#file-functions) for reading content and metadata
 
@@ -103,6 +104,8 @@ local sha256 = std.native("sha256");
 local sha256_file = std.native("sha256_file");
 local file_content = std.native("file_content");
 local file_stat = std.native("file_stat");
+local http_get = std.native("http_get");
+local http_request = std.native("http_request");
 local exec = std.native("exec");
 local exec_with_env = std.native("exec_with_env");
 
@@ -129,6 +132,18 @@ local exec_with_env = std.native("exec_with_env");
   config: std.parseJson(file_content("/etc/app/config.json")),
   config_modified: file_stat("/etc/app/config.json").mod_time,
   is_large_config: file_stat("/etc/app/config.json").size > 1024,
+
+  // HTTP requests
+  api_health: http_get("https://api.example.com/health", null),
+  user_data: http_get("https://api.example.com/user", {
+    "Authorization": "Bearer " + must_env("API_TOKEN")
+  }),
+  webhook_result: http_request("POST", "https://hooks.example.com/deploy", {
+    "Content-Type": "application/json"
+  }, std.manifestJson({
+    environment: std.extVar("env"),
+    commit: exec("git", ["rev-parse", "HEAD"]).stdout[0:7]
+  })),
   
   // Command execution
   git_commit: exec("git", ["rev-parse", "HEAD"]).stdout[0:7],
@@ -247,6 +262,7 @@ local armed = import 'armed.libsonnet';
   sha256_test: armed.sha256('test'),
   env_test: armed.env('USER', 'default_user'),
   file_content: armed.file_content('config.json'),
+  api_data: armed.http_get('https://api.example.com/data', null),
   command_result: armed.exec('echo', ['Hello, World!']),
 }
 ```
@@ -416,6 +432,139 @@ local sha256_file = std.native("sha256_file");
   short_hash: std.substr(sha256("data"), 0, 8)
 }
 ```
+
+### HTTP Functions
+
+Make HTTP requests and retrieve responses directly from Jsonnet with automatic User-Agent header (`jsonnet-armed/v0.0.7`).
+
+Available HTTP functions:
+- `http_get(url, headers)`: Make GET request with optional headers
+- `http_request(method, url, headers, body)`: Make HTTP request with specified method, headers, and body
+
+Both functions return an object with:
+- `status_code`: HTTP status code as number (200, 404, etc.)
+- `status`: HTTP status text as string ("200 OK", "404 Not Found", etc.)
+- `headers`: Response headers as object (single values as strings, multiple values as arrays)
+- `body`: Response body as string
+
+All requests have a 30-second timeout and automatically set a `User-Agent` header unless explicitly overridden.
+
+**Error Conditions:**
+HTTP functions will return an error (causing Jsonnet evaluation to fail) in the following cases:
+- Invalid function arguments (non-string URL, method, or header values)
+- Network connectivity issues (DNS resolution failure, connection refused)
+- Request timeout (30 seconds exceeded)
+- Invalid URL format or unsupported scheme
+- TLS/SSL certificate validation failures (for HTTPS)
+
+**Important:** HTTP error status codes (4xx, 5xx) do NOT cause function errors - they are returned in the response object for handling in Jsonnet.
+
+```jsonnet
+local http_get = std.native("http_get");
+local http_request = std.native("http_request");
+
+{
+  // Simple GET request
+  api_status: http_get("https://httpbin.org/get", null),
+  // Result: {status_code: 200, status: "200 OK", headers: {...}, body: "..."}
+
+  // GET with custom headers
+  authenticated_request: http_get("https://api.example.com/user", {
+    "Authorization": "Bearer your-token-here",
+    "Accept": "application/json"
+  }),
+
+  // POST request with JSON body
+  create_user: http_request("POST", "https://api.example.com/users", {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer your-token-here"
+  }, std.manifestJson({
+    name: "John Doe",
+    email: "john@example.com"
+  })),
+
+  // PUT request with custom User-Agent
+  update_data: http_request("PUT", "https://api.example.com/data/123", {
+    "Content-Type": "application/json",
+    "User-Agent": "my-custom-client/1.0"  // Overrides default User-Agent
+  }, std.manifestJson({
+    updated: true,
+    timestamp: std.native("now")()
+  })),
+
+  // Handle different status codes
+  safe_request: {
+    local response = http_get("https://api.example.com/maybe-missing", null),
+    success: response.status_code == 200,
+    data: if response.status_code == 200 then std.parseJson(response.body) else null,
+    error: if response.status_code != 200 then response.status else null
+  },
+
+  // Error handling for network failures
+  robust_request: {
+    local make_request() = http_get("https://unreliable-api.example.com/data", {
+      "Authorization": "Bearer token"
+    }),
+
+    // Note: Network errors cause Jsonnet evaluation to fail entirely
+    // To handle this, you would need to structure your Jsonnet differently
+    // or use conditional logic at a higher level
+    result: make_request(),
+
+    // For HTTP error status codes (which don't cause evaluation failure):
+    is_client_error: self.result.status_code >= 400 && self.result.status_code < 500,
+    is_server_error: self.result.status_code >= 500,
+    success: self.result.status_code >= 200 && self.result.status_code < 300
+  },
+
+  // Working with response headers
+  header_info: {
+    local response = http_get("https://httpbin.org/response-headers", null),
+    content_type: response.headers["Content-Type"],
+    server: response.headers.Server,  // Alternative syntax
+    all_headers: response.headers
+  },
+
+  // Conditional requests based on environment
+  config_from_api: {
+    local env = std.native("env"),
+    local api_url = env("CONFIG_API_URL", "https://config.example.com"),
+    local response = http_get(api_url + "/config", {
+      "Authorization": "Bearer " + env("CONFIG_TOKEN", "")
+    }),
+
+    success: response.status_code == 200,
+    config: if response.status_code == 200
+            then std.parseJson(response.body)
+            else {"default": "config"},
+    error_details: if response.status_code != 200
+                   then {
+                     status: response.status,
+                     body: response.body
+                   } else null
+  },
+
+  // Webhook notification
+  notify_deployment: http_request("POST", "https://hooks.slack.com/webhook/path", {
+    "Content-Type": "application/json"
+  }, std.manifestJson({
+    text: "Deployment completed for environment: " + std.extVar("env"),
+    timestamp: std.native("time_format")(std.native("now")(), "RFC3339")
+  }))
+}
+```
+
+**Security Notes:**
+- HTTPS is recommended for all requests containing sensitive data
+- Credentials should be passed via environment variables, not hardcoded
+- Request and response bodies are treated as strings - parse JSON using `std.parseJson()`
+- Response header names are canonicalized (Title-Case) by Go's HTTP client
+- Network failures cause Jsonnet evaluation to fail - consider using cache/stale options for resilience
+
+**Response Header Handling:**
+- Single header values are returned as strings: `"application/json"`
+- Multiple header values (e.g., `Set-Cookie`) are returned as arrays: `["cookie1=value1", "cookie2=value2"]`
+- Header names are automatically canonicalized by Go's HTTP client (e.g., `content-type` becomes `Content-Type`, `x-custom-header` becomes `X-Custom-Header`)
 
 ### External Command Execution
 
