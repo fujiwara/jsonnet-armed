@@ -65,10 +65,10 @@ func TestHttpFunctions(t *testing.T) {
 				"status_code": 200,
 				"status":      "200 OK",
 				"headers": map[string]any{
-					"Content-Type":    "application/json",
-					"X-Test-Header":   "test-value",
-					"X-User-Agent":    "jsonnet-armed/v0.0.7-test",
-					"Content-Length":  "19",
+					"Content-Type":   "application/json",
+					"X-Test-Header":  "test-value",
+					"X-User-Agent":   "jsonnet-armed/v0.0.7-test",
+					"Content-Length": "19",
 				},
 				"body": `{"message": "test"}`,
 			},
@@ -84,10 +84,10 @@ func TestHttpFunctions(t *testing.T) {
 				"status_code": 200,
 				"status":      "200 OK",
 				"headers": map[string]any{
-					"Content-Type":    "application/json",
-					"X-Test-Header":   "test-value",
-					"X-User-Agent":    "jsonnet-armed", // Custom User-Agent
-					"Content-Length":  "19",
+					"Content-Type":   "application/json",
+					"X-Test-Header":  "test-value",
+					"X-User-Agent":   "jsonnet-armed", // Custom User-Agent
+					"Content-Length": "19",
 				},
 				"body": `{"message": "test"}`,
 			},
