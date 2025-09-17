@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -314,13 +317,62 @@ func TestIntegrationExamples(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "HTTP functions example",
+			jsonnet: `
+			local http_get = std.native("http_get");
+			local http_request = std.native("http_request");
+			local server_url = std.extVar("SERVER_URL");
+			{
+				// Simple GET request
+				get_response: http_get(server_url + "/get", null),
+				// POST request with headers and body
+				post_response: http_request("POST", server_url + "/post",
+					{"Content-Type": "application/json"},
+					'{"test": "data"}')
+			}`,
+			expected: map[string]interface{}{
+				"get_response": map[string]interface{}{
+					"status_code": float64(200),
+					"status":      "200 OK",
+					"headers": map[string]interface{}{
+						"Content-Type": "application/json",
+					},
+					"body": `{"message": "get"}`,
+				},
+				"post_response": map[string]interface{}{
+					"status_code": float64(201),
+					"status":      "201 Created",
+					"headers": map[string]interface{}{
+						"Content-Type": "application/json",
+					},
+					"body": `{"message": "post"}`,
+				},
+			},
+			setup: func(t *testing.T) string {
+				// Start test HTTP server
+				return startTestHTTPServer(t)
+			},
+			cleanup: func(tmpDir string) {
+				// Cleanup is handled by test server context
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var tmpDir string
+			var serverURL string
 			if tt.setup != nil {
-				tmpDir = tt.setup(t)
+				result := tt.setup(t)
+				if strings.HasPrefix(result, "http") {
+					// setup returned server URL
+					serverURL = result
+					tmpDir = t.TempDir()
+				} else {
+					// setup returned tmpDir
+					tmpDir = result
+				}
 			}
 			if tt.cleanup != nil {
 				defer tt.cleanup(tmpDir)
@@ -337,9 +389,17 @@ func TestIntegrationExamples(t *testing.T) {
 
 			// Create CLI config with output capture
 			var output bytes.Buffer
+			extStr := tt.extStr
+			if extStr == nil {
+				extStr = make(map[string]string)
+			}
+			if serverURL != "" {
+				extStr["SERVER_URL"] = serverURL
+			}
+
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
-				ExtStr:   tt.extStr,
+				ExtStr:   extStr,
 				ExtCode:  tt.extCode,
 			}
 			cli.SetWriter(&output)
@@ -400,6 +460,12 @@ func normalizeTimestamps(m map[string]interface{}) {
 			switch v.(type) {
 			case float64, string:
 				// Keep as is - these are likely valid timestamps
+			}
+		} else if k == "headers" && v != nil {
+			// Remove dynamic HTTP headers
+			if headersMap, ok := v.(map[string]interface{}); ok {
+				delete(headersMap, "Date")
+				delete(headersMap, "Content-Length") // Can vary based on server implementation
 			}
 		} else if subMap, ok := v.(map[string]interface{}); ok {
 			normalizeTimestamps(subMap)
@@ -575,4 +641,31 @@ func TestIntegrationStaleCache(t *testing.T) {
 	if !strings.Contains(logOutput, "Evaluation failed, using stale cache") {
 		t.Errorf("Expected warning message about stale cache usage, got: %s", logOutput)
 	}
+}
+
+// startTestHTTPServer starts a test HTTP server for integration tests
+func startTestHTTPServer(t *testing.T) string {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/get":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"message": "get"}`)
+		case "/post":
+			if r.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprint(w, `{"message": "post"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+
+	// Use server.URL instead of fixed port
+	t.Cleanup(server.Close)
+
+	return server.URL
 }

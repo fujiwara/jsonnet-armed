@@ -167,6 +167,7 @@ func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (str
 	vm := jsonnet.MakeVM()
 
 	// Register native functions
+	ctx = context.WithValue(ctx, "version", Version)
 	funcs := functions.GenerateAllFunctions(ctx)
 	for _, f := range funcs {
 		vm.NativeFunction(f)
