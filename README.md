@@ -449,6 +449,16 @@ Both functions return an object with:
 
 All requests have a 30-second timeout and automatically set a `User-Agent` header unless explicitly overridden.
 
+**Error Conditions:**
+HTTP functions will return an error (causing Jsonnet evaluation to fail) in the following cases:
+- Invalid function arguments (non-string URL, method, or header values)
+- Network connectivity issues (DNS resolution failure, connection refused)
+- Request timeout (30 seconds exceeded)
+- Invalid URL format or unsupported scheme
+- TLS/SSL certificate validation failures (for HTTPS)
+
+**Important:** HTTP error status codes (4xx, 5xx) do NOT cause function errors - they are returned in the response object for handling in Jsonnet.
+
 ```jsonnet
 local http_get = std.native("http_get");
 local http_request = std.native("http_request");
@@ -488,6 +498,23 @@ local http_request = std.native("http_request");
     success: response.status_code == 200,
     data: if response.status_code == 200 then std.parseJson(response.body) else null,
     error: if response.status_code != 200 then response.status else null
+  },
+
+  // Error handling for network failures
+  robust_request: {
+    local make_request() = http_get("https://unreliable-api.example.com/data", {
+      "Authorization": "Bearer token"
+    }),
+
+    // Note: Network errors cause Jsonnet evaluation to fail entirely
+    // To handle this, you would need to structure your Jsonnet differently
+    // or use conditional logic at a higher level
+    result: make_request(),
+
+    // For HTTP error status codes (which don't cause evaluation failure):
+    is_client_error: self.result.status_code >= 400 && self.result.status_code < 500,
+    is_server_error: self.result.status_code >= 500,
+    success: self.result.status_code >= 200 && self.result.status_code < 300
   },
 
   // Working with response headers
@@ -532,6 +559,7 @@ local http_request = std.native("http_request");
 - Credentials should be passed via environment variables, not hardcoded
 - Request and response bodies are treated as strings - parse JSON using `std.parseJson()`
 - Response header names are canonicalized (Title-Case) by Go's HTTP client
+- Network failures cause Jsonnet evaluation to fail - consider using cache/stale options for resilience
 
 **Response Header Handling:**
 - Single header values are returned as strings: `"application/json"`
