@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.0.8](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.7...v0.0.8) - 2025-09-17
+- feat: add cache mechanism for evaluation results by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/27
+- feat: add stale cache fallback mechanism by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/29
+- feat: add HTTP functions for making HTTP requests by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/30
+- feat: add DNS lookup functions with HTTPS/SVCB record support by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/31
+
 ## [v0.0.7](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.6...v0.0.7) - 2025-09-16
 - feat: Implement atomic file writing with write-if-changed option by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/25
 
