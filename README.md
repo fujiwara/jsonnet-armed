@@ -686,7 +686,7 @@ Available exec functions:
 
 Both functions return an object with:
 - `stdout`: Standard output as string
-- `stderr`: Standard error as string  
+- `stderr`: Standard error as string
 - `exit_code`: Exit code as number (0 = success)
 
 Commands are executed with a 30-second timeout by default (configurable via `functions.DefaultExecTimeout`). When the CLI timeout is reached, running commands are cancelled immediately.

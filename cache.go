@@ -29,18 +29,12 @@ func NewCache(ttl time.Duration, staleTTL time.Duration) *Cache {
 
 // getCacheDir returns the cache directory path following XDG Base Directory specification
 func getCacheDir() string {
-	// Check XDG_CACHE_HOME first
-	if cacheHome := os.Getenv("XDG_CACHE_HOME"); cacheHome != "" {
-		return filepath.Join(cacheHome, "jsonnet-armed")
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		slog.Warn("Failed to get user cache directory, falling back to temp directory", "error", err)
+		return filepath.Join(os.TempDir(), "jsonnet-armed-cache")
 	}
-
-	// Fall back to $HOME/.cache
-	if home := os.Getenv("HOME"); home != "" {
-		return filepath.Join(home, ".cache", "jsonnet-armed")
-	}
-
-	// Last resort: use temporary directory
-	return filepath.Join(os.TempDir(), "jsonnet-armed-cache")
+	return filepath.Join(cacheDir, "jsonnet-armed")
 }
 
 // GenerateCacheKey creates a unique cache key based on input parameters and content
