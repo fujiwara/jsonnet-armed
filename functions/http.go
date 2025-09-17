@@ -14,6 +14,11 @@ import (
 
 const versionKey = "version"
 
+var (
+	// DefaultHttpTimeout is the default timeout for HTTP requests
+	DefaultHttpTimeout = 30 * time.Second
+)
+
 // setDefaultUserAgent sets the default User-Agent header if not already present
 func setDefaultUserAgent(req *http.Request, version string) {
 	if req.Header.Get("User-Agent") == "" {
@@ -46,7 +51,7 @@ func makeHttpRequest(method, url string, headers map[string]any, body string, ve
 	setDefaultUserAgent(req, version)
 
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: DefaultHttpTimeout,
 	}
 
 	resp, err := client.Do(req)
