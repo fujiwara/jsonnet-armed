@@ -34,6 +34,7 @@ jsonnet-armed [options] <jsonnet-file>
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
 - `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
 - `-c, --cache <duration>`: Cache evaluation results for specified duration (e.g., 5m, 1h)
+- `--stale <duration>`: Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)
 - `-v, --version`: Show version and exit
 
 #### Examples
@@ -69,6 +70,9 @@ jsonnet-armed --cache 5m config.jsonnet
 
 # Cache for 1 hour with external variables
 jsonnet-armed --cache 1h -V env=production large-config.jsonnet
+
+# Use stale cache fallback for reliability
+jsonnet-armed --cache 5m --stale 10m config.jsonnet
 ```
 
 #### Cache Feature
@@ -79,6 +83,16 @@ The cache feature stores evaluation results to avoid redundant computations:
 - Cache files are stored in `$XDG_CACHE_HOME/jsonnet-armed/` or `$HOME/.cache/jsonnet-armed/`
 - Expired cache entries are automatically cleaned up
 - Useful for expensive computations or frequently accessed configurations
+
+##### Stale Cache Fallback
+
+The `--stale` option provides resilience against evaluation failures:
+
+- When cache expires, evaluation is attempted normally
+- If evaluation fails (syntax error, missing dependencies, etc.), stale cache is used as fallback
+- Stale cache is only used when fresh evaluation fails, not proactively
+- Example: `--cache 5m --stale 10m` caches for 5 minutes, but allows using stale cache up to 10 minutes on errors
+- Helps maintain service availability when configuration sources become temporarily unavailable
 
 Example Jsonnet file using external variables and native functions:
 ```jsonnet

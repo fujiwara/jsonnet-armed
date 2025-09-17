@@ -183,7 +183,7 @@ func TestCacheKeyGeneration(t *testing.T) {
 				tt.cli2.Filename = tmpFile2
 			}
 
-			cache := armed.NewCache(time.Minute)
+			cache := armed.NewCache(time.Minute, 0)
 
 			// Read content for both files
 			content1, err := os.ReadFile(tt.cli1.Filename)

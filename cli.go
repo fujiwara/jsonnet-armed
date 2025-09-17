@@ -14,6 +14,7 @@ type CLI struct {
 	ExtCode        map[string]string `name:"ext-code" help:"Set external code variable (can be repeated)."`
 	Timeout        time.Duration     `short:"t" name:"timeout" help:"Timeout for evaluation (e.g., 30s, 5m, 1h)"`
 	Cache          time.Duration     `short:"c" name:"cache" help:"Cache evaluation results for specified duration (e.g., 5m, 1h)"`
+	Stale          time.Duration     `name:"stale" help:"Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)"`
 	Version        kong.VersionFlag  `short:"v" help:"Show version and exit."`
 
 	Filename string `arg:"" name:"filename" help:"Filename or code to execute" type:"path"`

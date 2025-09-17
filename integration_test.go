@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -482,5 +484,95 @@ func TestIntegrationCache(t *testing.T) {
 	// Should get exact same result as first (from cache)
 	if diff := cmp.Diff(firstResult, thirdResult); diff != "" {
 		t.Errorf("Cache hit should return identical result (-first +third):\n%s", diff)
+	}
+}
+
+func TestIntegrationStaleCache(t *testing.T) {
+	ctx := context.Background()
+
+	// Create a temporary file for testing
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "stale_test.jsonnet")
+	// Use must_env which will fail if the env var doesn't exist
+	validJsonnet := `
+		local must_env = std.native("must_env");
+		{
+			value: "success",
+			timestamp: std.extVar("ts"),
+			env_check: must_env("TEST_STALE_CACHE_VAR")
+		}`
+	if err := os.WriteFile(testFile, []byte(validJsonnet), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// Set the environment variable for the first evaluation
+	t.Setenv("TEST_STALE_CACHE_VAR", "env_value")
+
+	// First evaluation to create cache
+	cli1 := &armed.CLI{
+		Filename: testFile,
+		ExtStr:   map[string]string{"ts": "cached"},
+		Cache:    50 * time.Millisecond,  // Short cache TTL
+		Stale:    500 * time.Millisecond, // Longer stale TTL
+	}
+	var buf1 bytes.Buffer
+	cli1.SetWriter(&buf1)
+
+	if err := cli1.Run(ctx); err != nil {
+		t.Fatalf("First evaluation failed: %v", err)
+	}
+
+	firstResult := buf1.String()
+	expected := map[string]interface{}{
+		"value":     "success",
+		"timestamp": "cached",
+		"env_check": "env_value",
+	}
+
+	var firstJSON map[string]interface{}
+	if err := json.Unmarshal([]byte(firstResult), &firstJSON); err != nil {
+		t.Fatalf("Failed to parse first result: %v", err)
+	}
+
+	if diff := cmp.Diff(expected, firstJSON); diff != "" {
+		t.Errorf("First result mismatch (-want +got):\n%s", diff)
+	}
+
+	// Wait for cache to expire but stay within stale period
+	time.Sleep(100 * time.Millisecond)
+
+	// Unset the environment variable to cause must_env to fail
+	os.Unsetenv("TEST_STALE_CACHE_VAR")
+
+	// Capture slog output to verify warning message
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logBuf, nil))
+	slog.SetDefault(logger)
+
+	// Second evaluation should use stale cache due to evaluation error
+	cli2 := &armed.CLI{
+		Filename: testFile,
+		ExtStr:   map[string]string{"ts": "cached"},
+		Cache:    50 * time.Millisecond,
+		Stale:    500 * time.Millisecond,
+	}
+	var buf2 bytes.Buffer
+	cli2.SetWriter(&buf2)
+
+	if err := cli2.Run(ctx); err != nil {
+		t.Fatalf("Second evaluation should succeed using stale cache but failed: %v", err)
+	}
+
+	secondResult := buf2.String()
+
+	// Should get same result as first evaluation (from stale cache)
+	if diff := cmp.Diff(firstResult, secondResult); diff != "" {
+		t.Errorf("Stale cache should return same result (-first +second):\n%s", diff)
+	}
+
+	// Verify warning message was logged
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "Evaluation failed, using stale cache") {
+		t.Errorf("Expected warning message about stale cache usage, got: %s", logOutput)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,15 +13,17 @@ import (
 )
 
 type Cache struct {
-	dir string
-	ttl time.Duration
+	dir      string
+	ttl      time.Duration
+	staleTTL time.Duration
 }
 
 // NewCache creates a new cache instance
-func NewCache(ttl time.Duration) *Cache {
+func NewCache(ttl time.Duration, staleTTL time.Duration) *Cache {
 	return &Cache{
-		dir: getCacheDir(),
-		ttl: ttl,
+		dir:      getCacheDir(),
+		ttl:      ttl,
+		staleTTL: staleTTL,
 	}
 }
 
@@ -69,10 +72,21 @@ func (c *Cache) GenerateCacheKey(cli *CLI, content []byte) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-// Get retrieves a cached result if it exists and is not expired
+// Get retrieves a cached result if it exists and is not expired (deprecated)
+// Use GetWithStale instead for stale cache support
 func (c *Cache) Get(key string) (string, bool) {
+	content, isStale, exists := c.GetWithStale(key)
+	if exists && !isStale {
+		return content, true
+	}
+	return "", false
+}
+
+// GetWithStale retrieves a cached result with stale status information
+// Returns (content, isStale, exists)
+func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 	if c.ttl == 0 {
-		return "", false
+		return "", false, false
 	}
 
 	cachePath := filepath.Join(c.dir, key+".json")
@@ -80,23 +94,45 @@ func (c *Cache) Get(key string) (string, bool) {
 	// Check file stats first
 	stat, err := os.Stat(cachePath)
 	if err != nil {
-		return "", false
+		return "", false, false
 	}
 
-	// Check if cache is expired
-	if time.Since(stat.ModTime()) > c.ttl {
-		// Cache is expired, remove it
-		os.Remove(cachePath)
-		return "", false
+	age := time.Since(stat.ModTime())
+
+	// Check fresh cache first (within TTL)
+	if age <= c.ttl {
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			slog.Warn("Failed to read fresh cache file",
+				"error", err.Error(),
+				"cache_path", cachePath,
+				"cache_key", key[:8]+"...")
+			return "", false, false
+		}
+		return string(data), false, true
 	}
 
-	// Read the cached result directly
-	data, err := os.ReadFile(cachePath)
-	if err != nil {
-		return "", false
+	// Check stale cache (within staleTTL)
+	if c.staleTTL > 0 && age <= c.staleTTL {
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			slog.Warn("Failed to read stale cache file",
+				"error", err.Error(),
+				"cache_path", cachePath,
+				"cache_key", key[:8]+"...")
+			return "", false, false
+		}
+		return string(data), true, true
 	}
 
-	return string(data), true
+	// Completely expired - remove it
+	if err := os.Remove(cachePath); err != nil {
+		slog.Warn("Failed to remove expired cache file",
+			"error", err.Error(),
+			"cache_path", cachePath,
+			"cache_key", key[:8]+"...")
+	}
+	return "", false, false
 }
 
 // Set stores a result in the cache
@@ -107,6 +143,9 @@ func (c *Cache) Set(key string, result string) error {
 
 	// Ensure cache directory exists
 	if err := os.MkdirAll(c.dir, 0755); err != nil {
+		slog.Warn("Failed to create cache directory",
+			"error", err.Error(),
+			"cache_dir", c.dir)
 		return err
 	}
 
@@ -130,6 +169,13 @@ func (c *Cache) Clean() error {
 		return err
 	}
 
+	// Determine maximum age to keep cache files
+	// Use staleTTL if it's longer than ttl, otherwise use ttl
+	maxAge := c.ttl
+	if c.staleTTL > 0 && c.staleTTL > c.ttl {
+		maxAge = c.staleTTL
+	}
+
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -141,9 +187,13 @@ func (c *Cache) Clean() error {
 			continue
 		}
 
-		if time.Since(stat.ModTime()) > c.ttl {
-			// Expired, remove it
-			os.Remove(cachePath)
+		if time.Since(stat.ModTime()) > maxAge {
+			// Completely expired, remove it
+			if err := os.Remove(cachePath); err != nil {
+				slog.Warn("Failed to remove expired cache file during cleanup",
+					"error", err.Error(),
+					"cache_path", cachePath)
+			}
 		}
 	}
 
