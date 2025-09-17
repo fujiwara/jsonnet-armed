@@ -357,6 +357,47 @@ func TestIntegrationExamples(t *testing.T) {
 				// Cleanup is handled by test server context
 			},
 		},
+		{
+			name: "DNS lookup functions example",
+			jsonnet: `
+			local dns_lookup = std.native("dns_lookup");
+			{
+				// A record lookup
+				google_a: dns_lookup("google.com", "A"),
+				// MX record lookup
+				google_mx: dns_lookup("google.com", "MX"),
+				// TXT record lookup (may be empty for some domains)
+				google_txt: dns_lookup("google.com", "TXT"),
+				// PTR record lookup
+				cloudflare_ptr: dns_lookup("1.1.1.1", "PTR"),
+			}`,
+			expected: map[string]interface{}{
+				"google_a": map[string]interface{}{
+					"hostname": "google.com",
+					"type":     "A",
+					"success":  true,
+					"records":  []interface{}{"<dynamic_records>"},
+				},
+				"google_mx": map[string]interface{}{
+					"hostname": "google.com",
+					"type":     "MX",
+					"success":  true,
+					"records":  []interface{}{"<dynamic_records>"},
+				},
+				"google_txt": map[string]interface{}{
+					"hostname": "google.com",
+					"type":     "TXT",
+					"success":  true,
+					"records":  []interface{}{"<dynamic_records>"},
+				},
+				"cloudflare_ptr": map[string]interface{}{
+					"hostname": "1.1.1.1",
+					"type":     "PTR",
+					"success":  true,
+					"records":  []interface{}{"<dynamic_records>"},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -466,6 +507,15 @@ func normalizeTimestamps(m map[string]interface{}) {
 			if headersMap, ok := v.(map[string]interface{}); ok {
 				delete(headersMap, "Date")
 				delete(headersMap, "Content-Length") // Can vary based on server implementation
+			}
+		} else if k == "records" && v != nil {
+			// For DNS records, validate structure but don't compare exact values
+			// as they are dynamic (IP addresses, MX records, etc.)
+			if recordsList, ok := v.([]interface{}); ok {
+				// Just verify we have some records
+				if len(recordsList) > 0 {
+					m[k] = []interface{}{"<dynamic_records>"}
+				}
 			}
 		} else if subMap, ok := v.(map[string]interface{}); ok {
 			normalizeTimestamps(subMap)

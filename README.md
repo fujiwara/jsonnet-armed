@@ -10,6 +10,7 @@ A Jsonnet rendering tool with additional useful functions.
 - [Base64 encoding functions](#base64-functions) (standard and URL-safe)
 - [Hash functions](#hash-functions) for cryptographic operations
 - [HTTP functions](#http-functions) for making HTTP requests
+- [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
 - [External command execution](#external-command-execution) with timeout and cancellation
 - [File functions](#file-functions) for reading content and metadata
 
@@ -565,6 +566,115 @@ local http_request = std.native("http_request");
 - Single header values are returned as strings: `"application/json"`
 - Multiple header values (e.g., `Set-Cookie`) are returned as arrays: `["cookie1=value1", "cookie2=value2"]`
 - Header names are automatically canonicalized by Go's HTTP client (e.g., `content-type` becomes `Content-Type`, `x-custom-header` becomes `X-Custom-Header`)
+
+### DNS Functions
+
+Perform DNS lookups for various record types with comprehensive support for modern DNS standards.
+
+Available DNS function:
+- `dns_lookup(hostname, record_type)`: Perform DNS lookup for specified hostname and record type
+
+The function returns an object with:
+- `hostname`: The queried hostname
+- `type`: The DNS record type (uppercased)
+- `success`: Always true for successful lookups
+- `records`: Array of DNS records (format varies by record type)
+
+**Supported Record Types:**
+- `A`: IPv4 addresses
+- `AAAA`: IPv6 addresses
+- `MX`: Mail exchange records with priority and hostname
+- `TXT`: Text records
+- `PTR`: Reverse DNS (IP to hostname)
+- `CNAME`: Canonical name records
+- `NS`: Name server records
+- `HTTPS`: HTTPS service binding records (RFC 9460)
+- `SVCB`: Service binding records (RFC 9460)
+
+DNS lookups have a 10-second timeout by default. Network failures cause Jsonnet evaluation to fail.
+
+```jsonnet
+local dns_lookup = std.native("dns_lookup");
+
+{
+  // Basic A record lookup
+  google_ips: dns_lookup("google.com", "A"),
+  // Result: {hostname: "google.com", type: "A", success: true, records: ["142.250.xxx.xxx", ...]}
+
+  // IPv6 addresses
+  google_ipv6: dns_lookup("google.com", "AAAA"),
+  // Result: {hostname: "google.com", type: "AAAA", success: true, records: ["2607:f8b0:xxx", ...]}
+
+  // Mail servers
+  gmail_mx: dns_lookup("gmail.com", "MX"),
+  // Result: {hostname: "gmail.com", type: "MX", success: true,
+  //          records: [{priority: 5, hostname: "gmail-smtp-in.l.google.com"}, ...]}
+
+  // Text records (SPF, DKIM, etc.)
+  google_txt: dns_lookup("google.com", "TXT"),
+  // Result: {hostname: "google.com", type: "TXT", success: true,
+  //          records: ["v=spf1 include:_spf.google.com ~all", ...]}
+
+  // Reverse DNS lookup
+  dns_google: dns_lookup("8.8.8.8", "PTR"),
+  // Result: {hostname: "8.8.8.8", type: "PTR", success: true, records: ["dns.google"]}
+
+  // Name servers
+  google_ns: dns_lookup("google.com", "NS"),
+  // Result: {hostname: "google.com", type: "NS", success: true,
+  //          records: ["ns1.google.com", "ns2.google.com", ...]}
+
+  // HTTPS service binding (modern HTTP/3 support detection)
+  cloudflare_https: dns_lookup("cloudflare.com", "HTTPS"),
+  // Result: {hostname: "cloudflare.com", type: "HTTPS", success: true,
+  //          records: [{
+  //            priority: 1,
+  //            target: "",
+  //            params: {
+  //              alpn: ["h3", "h2"],
+  //              ipv4hint: ["104.16.132.229", "104.16.133.229"],
+  //              ipv6hint: ["2606:4700::6810:84e5", "2606:4700::6810:85e5"]
+  //            }
+  //          }]}
+
+  // Case insensitive record types
+  case_insensitive: dns_lookup("example.com", "a"),  // Same as "A"
+
+  // Practical usage: Check if domain supports HTTP/3
+  http3_support: {
+    local https_record = dns_lookup("cloudflare.com", "HTTPS"),
+    has_http3: std.length([
+      record for record in https_record.records
+      if std.member(std.get(std.get(record, "params", {}), "alpn", []), "h3")
+    ]) > 0
+  },
+
+  // Load balancer IP discovery
+  service_ips: {
+    local a_records = dns_lookup("service.example.com", "A"),
+    primary_ip: if std.length(a_records.records) > 0 then a_records.records[0] else null,
+    all_ips: a_records.records,
+    ip_count: std.length(a_records.records)
+  }
+}
+```
+
+**HTTPS/SVCB Record Details:**
+HTTPS and SVCB records (RFC 9460) provide service binding information for modern web services:
+- `priority`: Service priority (lower values preferred)
+- `target`: Target hostname (empty string means same as queried hostname)
+- `params`: Service parameters object containing:
+  - `alpn`: Supported application protocols (e.g., `["h3", "h2"]` for HTTP/3 and HTTP/2)
+  - `port`: Alternative service port (if different from default)
+  - `ipv4hint`: IPv4 address hints for faster connection setup
+  - `ipv6hint`: IPv6 address hints for faster connection setup
+
+**Error Handling:**
+DNS functions will return an error (causing Jsonnet evaluation to fail) in the following cases:
+- Invalid function arguments (non-string hostname or record_type)
+- DNS resolution failures (NXDOMAIN, timeout, server failure)
+- Unsupported record types
+- Network connectivity issues
 
 ### External Command Execution
 

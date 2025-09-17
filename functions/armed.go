@@ -33,6 +33,9 @@ func GenerateAllFunctions(ctx context.Context) []*jsonnet.NativeFunction {
 	for _, f := range GenerateHttpFunctions(ctx) {
 		all = append(all, f)
 	}
+	for _, f := range DnsFunctions {
+		all = append(all, f)
+	}
 
 	return all
 }
