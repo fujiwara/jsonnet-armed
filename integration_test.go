@@ -440,6 +440,26 @@ func TestIntegrationExamples(t *testing.T) {
 				"space_split":  []interface{}{"hello", "world", "test"},
 			},
 		},
+		{
+			name: "UUID functions example",
+			jsonnet: `
+			local uuid_v4 = std.native("uuid_v4");
+			local uuid_v7 = std.native("uuid_v7");
+			{
+				// Generate UUID v4 (random)
+				uuid_v4_1: uuid_v4(),
+				uuid_v4_2: uuid_v4(),
+				// Generate UUID v7 (time-ordered)
+				uuid_v7_1: uuid_v7(),
+				uuid_v7_2: uuid_v7(),
+			}`,
+			expected: map[string]interface{}{
+				"uuid_v4_1": "<valid_uuid_v4>",
+				"uuid_v4_2": "<valid_uuid_v4>",
+				"uuid_v7_1": "<valid_uuid_v7>",
+				"uuid_v7_2": "<valid_uuid_v7>",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -536,6 +556,8 @@ func deepCopyMap(m map[string]interface{}) map[string]interface{} {
 
 func normalizeTimestamps(m map[string]interface{}) {
 	timestampPattern := regexp.MustCompile(`^(timestamp|time|mod_time|now)`)
+	uuidV4Pattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	uuidV7Pattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 	for k, v := range m {
 		if timestampPattern.MatchString(k) {
@@ -543,6 +565,16 @@ func normalizeTimestamps(m map[string]interface{}) {
 			switch v.(type) {
 			case float64, string:
 				// Keep as is - these are likely valid timestamps
+			}
+		} else if strings.Contains(k, "uuid_v4") && v != nil {
+			// Validate UUID v4 format
+			if uuidStr, ok := v.(string); ok && uuidV4Pattern.MatchString(uuidStr) {
+				m[k] = "<valid_uuid_v4>"
+			}
+		} else if strings.Contains(k, "uuid_v7") && v != nil {
+			// Validate UUID v7 format
+			if uuidStr, ok := v.(string); ok && uuidV7Pattern.MatchString(uuidStr) {
+				m[k] = "<valid_uuid_v7>"
 			}
 		} else if k == "headers" && v != nil {
 			// Remove dynamic HTTP headers

@@ -39,6 +39,9 @@ func GenerateAllFunctions(ctx context.Context) []*jsonnet.NativeFunction {
 	for _, f := range RegexpFunctions {
 		all = append(all, f)
 	}
+	for _, f := range UuidFunctions {
+		all = append(all, f)
+	}
 
 	return all
 }
