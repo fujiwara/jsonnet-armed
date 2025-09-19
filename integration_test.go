@@ -398,6 +398,48 @@ func TestIntegrationExamples(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Regexp functions example",
+			jsonnet: `
+			local regex_match = std.native("regex_match");
+			local regex_find = std.native("regex_find");
+			local regex_find_all = std.native("regex_find_all");
+			local regex_replace = std.native("regex_replace");
+			local regex_split = std.native("regex_split");
+			{
+				// Basic pattern matching
+				is_email: regex_match("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", "test@example.com"),
+				not_email: regex_match("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", "invalid-email"),
+
+				// Find patterns
+				first_number: regex_find("[0-9]+", "test123world456"),
+				no_match: regex_find("xyz", "hello world"),
+
+				// Find all matches
+				all_numbers: regex_find_all("[0-9]+", "test123world456end789"),
+				all_words: regex_find_all("[a-zA-Z]+", "hello123world456test"),
+
+				// String replacement
+				sanitized: regex_replace("[^a-zA-Z0-9]", "_", "hello-world!@#"),
+				clean_spaces: regex_replace("\\s+", " ", "hello   world  test"),
+
+				// String splitting
+				csv_split: regex_split(",", "a,b,c,d"),
+				space_split: regex_split("\\s+", "hello   world  test")
+			}`,
+			expected: map[string]interface{}{
+				"is_email":     true,
+				"not_email":    false,
+				"first_number": "123",
+				"no_match":     nil,
+				"all_numbers":  []interface{}{"123", "456", "789"},
+				"all_words":    []interface{}{"hello", "world", "test"},
+				"sanitized":    "hello_world___",
+				"clean_spaces": "hello world test",
+				"csv_split":    []interface{}{"a", "b", "c", "d"},
+				"space_split":  []interface{}{"hello", "world", "test"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
