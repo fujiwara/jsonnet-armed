@@ -11,6 +11,7 @@ A Jsonnet rendering tool with additional useful functions.
 - [Hash functions](#hash-functions) for cryptographic operations
 - [HTTP functions](#http-functions) for making HTTP requests
 - [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
+- [Regular expression functions](#regular-expression-functions) for pattern matching and text manipulation
 - [External command execution](#external-command-execution) with timeout and cancellation
 - [File functions](#file-functions) for reading content and metadata
 
@@ -759,6 +760,121 @@ local exec_with_env = std.native("exec_with_env");
 - Default timeout: 30 seconds (configurable via `functions.DefaultExecTimeout`)
 - If CLI has `--timeout` flag, exec commands are cancelled when CLI times out
 - Process termination: SIGTERM → 5 second grace period → SIGKILL
+
+### Regular Expression Functions
+
+Perform pattern matching and text manipulation using regular expressions with full Go regex syntax support.
+
+Available regexp functions:
+- `regex_match(pattern, text)`: Check if text matches the pattern (returns boolean)
+- `regex_find(pattern, text)`: Find first match (returns string or null)
+- `regex_find_all(pattern, text)`: Find all matches (returns array of strings)
+- `regex_replace(pattern, replacement, text)`: Replace all matches (returns string)
+- `regex_split(pattern, text)`: Split text by pattern (returns array of strings)
+
+All functions use Go's `regexp` package syntax and return errors for invalid patterns. Pattern compilation is performed for each function call.
+
+```jsonnet
+local regex_match = std.native("regex_match");
+local regex_find = std.native("regex_find");
+local regex_find_all = std.native("regex_find_all");
+local regex_replace = std.native("regex_replace");
+local regex_split = std.native("regex_split");
+
+{
+  // Pattern matching for validation
+  is_email: regex_match("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", "test@example.com"),
+  is_valid_ip: regex_match("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "192.168.1.1"),
+  is_uuid: regex_match("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", uuid_string),
+
+  // Finding patterns
+  first_number: regex_find("[0-9]+", "version 1.2.3"),        // "1"
+  extract_domain: regex_find("@([a-zA-Z0-9.-]+)", "user@example.com"), // "@example.com"
+  no_match: regex_find("xyz", "hello world"),                 // null
+
+  // Finding all matches
+  all_numbers: regex_find_all("[0-9]+", "version 1.2.3"),     // ["1", "2", "3"]
+  extract_words: regex_find_all("[a-zA-Z]+", "hello 123 world 456"), // ["hello", "world"]
+  ip_addresses: regex_find_all("([0-9]{1,3}\\.){3}[0-9]{1,3}", log_text),
+
+  // Text replacement and sanitization
+  sanitized_name: regex_replace("[^a-zA-Z0-9_-]", "_", "My App Name!"),  // "My_App_Name_"
+  normalize_spaces: regex_replace("\\s+", " ", "hello   world    test"), // "hello world test"
+  remove_tags: regex_replace("<[^>]*>", "", "<p>Hello <b>World</b></p>"), // "Hello World"
+
+  // Environment variable substitution
+  config_with_vars: regex_replace("\\$\\{([^}]+)\\}",
+    std.native("env")("$1", "default"),
+    "database: ${DATABASE_URL}"
+  ),
+
+  // Text splitting
+  csv_parse: regex_split(",\\s*", "apple, banana, cherry"),   // ["apple", "banana", "cherry"]
+  split_lines: regex_split("\\r?\\n", multi_line_text),       // Split by line breaks
+  tokenize: regex_split("\\s+", "  hello   world  test  "),   // ["hello", "world", "test"]
+
+  // Log parsing
+  parse_log: {
+    local log_line = "2024-01-15 10:30:45 [ERROR] Failed to connect: timeout",
+    timestamp: regex_find("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}", log_line),
+    level: regex_find("\\[(\\w+)\\]", log_line),
+    message: regex_replace("^[^\\]]+\\]\\s*", "", log_line)
+  },
+
+  // URL parsing
+  parse_url: {
+    local url = "https://api.example.com:8080/v1/users?limit=10",
+    protocol: regex_find("^(https?)://", url),               // "https"
+    host: regex_find("://([^:/]+)", url),                    // "api.example.com"
+    port: regex_find(":([0-9]+)/", url),                     // "8080"
+    path: regex_find("://[^/]+(/[^?]*)", url),               // "/v1/users"
+    query: regex_find("\\?(.+)$", url)                       // "limit=10"
+  },
+
+  // Conditional logic with regex
+  file_type: {
+    local filename = "config.yaml",
+    is_json: regex_match("\\.json$", filename),
+    is_yaml: regex_match("\\.(yaml|yml)$", filename),
+    is_config: regex_match("\\.(json|yaml|yml|toml|ini)$", filename)
+  },
+
+  // Version comparison
+  version_info: {
+    local version = "v1.2.3-alpha.1",
+    major: regex_find("v?([0-9]+)", version),                // "1"
+    minor: regex_find("v?[0-9]+\\.([0-9]+)", version),       // "2"
+    patch: regex_find("v?[0-9]+\\.[0-9]+\\.([0-9]+)", version), // "3"
+    is_prerelease: regex_match("-", version),                 // true
+    prerelease_type: regex_find("-([a-zA-Z]+)", version)     // "alpha"
+  }
+}
+```
+
+**Pattern Syntax:**
+Regular expressions use Go's RE2 syntax, which includes:
+- `.`: Any character except newline
+- `*`: Zero or more repetitions
+- `+`: One or more repetitions
+- `?`: Zero or one repetition
+- `^`: Start of string
+- `$`: End of string
+- `[]`: Character class (e.g., `[a-z]`, `[0-9]`)
+- `()`: Capturing groups
+- `|`: Alternation
+- `\`: Escape character
+
+**Common Patterns:**
+- Email: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+- IPv4: `^([0-9]{1,3}\.){3}[0-9]{1,3}$`
+- UUID: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+- Semver: `^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9.-]+)?$`
+- URL: `^https?://[a-zA-Z0-9.-]+(/.*)?$`
+
+**Error Handling:**
+Regular expression functions will return an error (causing Jsonnet evaluation to fail) for:
+- Invalid regular expression patterns
+- Non-string arguments for pattern, replacement, or text parameters
 
 ### File Functions
 Access file content and metadata directly from Jsonnet.

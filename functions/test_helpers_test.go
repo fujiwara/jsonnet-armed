@@ -55,3 +55,11 @@ func getExecFunction(ctx context.Context, name string) (func([]any) (any, error)
 	}
 	return f.Func, nil
 }
+
+func getRegexpFunction(name string) (func([]any) (any, error), error) {
+	f, ok := functions.RegexpFunctions[name]
+	if !ok {
+		return nil, fmt.Errorf("regexp function %s not found", name)
+	}
+	return f.Func, nil
+}
