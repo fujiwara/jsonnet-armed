@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-jsonnet v0.21.0
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/miekg/dns v1.1.68
 	golang.org/x/sys v0.36.0
