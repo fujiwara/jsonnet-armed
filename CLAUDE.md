@@ -113,6 +113,80 @@ go test -v ./...
 make install
 ```
 
+## Native Function Development Guidelines
+
+### Function Planning and Research
+- Before implementing new functions, research existing Jsonnet standard library functions to avoid duplication
+- Use reliable, well-maintained libraries (e.g., `github.com/google/uuid` for UUID generation)
+- Prioritize functions that fill gaps in infrastructure/DevOps configuration use cases
+- Consider security implications: use proven cryptographic libraries rather than custom implementations
+
+### Function Categories and Naming
+- Follow consistent naming patterns: `<category>_<operation>` (e.g., `uuid_v4`, `regex_match`)
+- Group related functions in single files (e.g., `uuid.go` for all UUID functions)
+- Export function maps with descriptive names (e.g., `UuidFunctions`, `RegexpFunctions`)
+
+### Function Implementation Patterns
+- All native functions should accept `[]any` parameters and return `(any, error)`
+- Validate input types early and return descriptive errors
+- Return JSON-compatible types: use `[]any` instead of `[]string` for arrays
+- Handle edge cases gracefully (e.g., return empty arrays instead of nil for no matches)
+
+### Function Registration
+- Register function maps in `functions/armed.go` within `GenerateAllFunctions()`
+- Use `initializeFunctionMap()` helper in each function file's `init()` function
+- Ensure functions are available both as native functions and in the armed library
+
+### Integration Test Requirements
+- Add integration test cases in `integration_test.go` following existing patterns
+- For dynamic outputs (UUIDs, timestamps), use validation patterns in `normalizeTimestamps()`
+- Test realistic use cases that demonstrate practical value
+
+### Documentation and Examples
+- Document new functions in integration tests with realistic usage examples
+- Follow existing comment patterns in function implementations
+- Update README.md with new function categories and examples when adding significant functionality
+
+### Dependency Management
+- Prefer standard library when possible
+- For external dependencies, choose well-maintained, popular libraries
+- Always run `go mod tidy` after adding dependencies
+- Consider dependency size and security implications
+
+### Testing Strategy for Dynamic Functions
+- For functions with non-deterministic outputs (UUIDs, random values, timestamps):
+  - Test format/pattern validity using regular expressions
+  - Test functional properties (e.g., UUID v7 time ordering)
+  - Use validation placeholders in integration tests (e.g., `<valid_uuid_v4>`)
+  - Implement custom comparison logic in test helpers when needed
+
+### Security Considerations
+- Never implement custom cryptographic functions
+- Use established libraries for security-sensitive operations
+- Validate inputs to prevent injection attacks in exec-style functions
+- Consider rate limiting for network-based functions
+
+## Code Quality and Review Guidelines
+
+### Pre-commit Checklist
+- [ ] Run `go fmt ./...` to format code
+- [ ] Run `go mod tidy` to clean dependencies
+- [ ] Run unit tests: `go test -v ./functions`
+- [ ] Run integration tests: `go test -v`
+- [ ] Verify new functions work in practice with test Jsonnet files
+
+### Branch and PR Workflow
+- Create feature branches with descriptive names: `feature/function-category`
+- Use clear, concise commit messages explaining the "why" not just the "what"
+- Include comprehensive test coverage in PR descriptions
+- Test functions manually before creating PRs
+
+### Function Validation Criteria
+- Functions should solve real-world infrastructure/configuration problems
+- Avoid duplicating Jsonnet standard library functionality
+- Ensure cross-platform compatibility (especially for file/path operations)
+- Consider performance implications for functions that might be called frequently
+
 ## Future Enhancements
 - Native functions support (currently commented out in code)
 - Additional Jsonnet extensions and utility functions
