@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.0.9](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.8...v0.0.9) - 2025-09-20
+- Use os.UserCacheDir() instead of lookup environment variables directly. by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/32
+- Add regular expression functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/34
+- Add UUID v4 and v7 generation functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/35
+- Add comprehensive native function development guidelines by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/36
+- Add UUID functions documentation to README by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/37
+
 ## [v0.0.8](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.7...v0.0.8) - 2025-09-17
 - feat: add cache mechanism for evaluation results by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/27
 - feat: add stale cache fallback mechanism by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/29
