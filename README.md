@@ -9,6 +9,7 @@ A Jsonnet rendering tool with additional useful functions.
 - [Time functions](#time-functions) for current timestamp and formatting
 - [Base64 encoding functions](#base64-functions) (standard and URL-safe)
 - [Hash functions](#hash-functions) for cryptographic operations
+- [UUID functions](#uuid-functions) for generating UUIDs (v4 and v7)
 - [HTTP functions](#http-functions) for making HTTP requests
 - [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
 - [Regular expression functions](#regular-expression-functions) for pattern matching and text manipulation
@@ -394,7 +395,7 @@ Available hash functions:
 
 **String Hash Functions:**
 - `md5(data)`: MD5 hash (32 characters)
-- `sha1(data)`: SHA-1 hash (40 characters)  
+- `sha1(data)`: SHA-1 hash (40 characters)
 - `sha256(data)`: SHA-256 hash (64 characters)
 - `sha512(data)`: SHA-512 hash (128 characters)
 
@@ -419,21 +420,71 @@ local sha256_file = std.native("sha256_file");
   sha1_hash: sha1("hello"),     // "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
   sha256_hash: sha256("hello"), // "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
   sha512_hash: sha512("hello"), // 128 character hash
-  
+
   // File hash functions
   config_file_hash: sha256_file("/etc/config.json"),
   self_hash: md5_file(std.thisFile),
-  
+
   // Compare string vs file content
   matches: sha256("hello") == sha256_file("/tmp/hello.txt"),
-  
+
   // Can be used with variables
   user_id: sha256(std.extVar("username")),
-  
+
   // Combine with other functions
   short_hash: std.substr(sha256("data"), 0, 8)
 }
 ```
+
+### UUID Functions
+Generate UUIDs for unique identifiers.
+
+Available UUID functions:
+- `uuid_v4()`: Generate a random UUID version 4
+- `uuid_v7()`: Generate a time-based UUID version 7 (sortable by timestamp)
+
+```jsonnet
+local uuid_v4 = std.native("uuid_v4");
+local uuid_v7 = std.native("uuid_v7");
+
+{
+  // Generate random UUID v4
+  request_id: uuid_v4(),      // e.g., "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  session_id: uuid_v4(),      // e.g., "550e8400-e29b-41d4-a716-446655440000"
+
+  // Generate time-based UUID v7 (sortable, includes timestamp)
+  event_id: uuid_v7(),        // e.g., "01928b7e-7c9e-7142-9f7c-123456789abc"
+  correlation_id: uuid_v7(),  // e.g., "01928b7e-7ca0-72f8-b834-987654321def"
+
+  // Use in arrays (each call generates a new UUID)
+  node_ids: [
+    uuid_v4(),
+    uuid_v4(),
+    uuid_v4()
+  ],
+
+  // Create unique resource names
+  bucket_name: "data-" + uuid_v4(),
+
+  // Time-ordered IDs for events (v7 UUIDs are sortable by creation time)
+  events: [
+    {
+      id: uuid_v7(),
+      action: "created",
+      timestamp: std.native("now")()
+    },
+    {
+      id: uuid_v7(),
+      action: "updated",
+      timestamp: std.native("now")()
+    }
+  ]
+}
+```
+
+**UUID v4 vs v7:**
+- **UUID v4**: Random UUIDs, suitable for general unique identifier needs
+- **UUID v7**: Time-based UUIDs that embed a timestamp, making them naturally sortable by creation time. Useful for database primary keys and event IDs where time ordering is important
 
 ### HTTP Functions
 
