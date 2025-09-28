@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.10](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.9...v0.0.10) - 2025-09-28
+- Add support for custom native functions in library usage by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/38
+- feat: Add HTTP/HTTPS output support by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/40
+
 ## [v0.0.9](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.8...v0.0.9) - 2025-09-20
 - Use os.UserCacheDir() instead of lookup environment variables directly. by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/32
 - Add regular expression functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/34
