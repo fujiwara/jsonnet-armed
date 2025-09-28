@@ -6,26 +6,26 @@ A Jsonnet rendering tool with additional useful functions.
 
 jsonnet-armed provides standard Jsonnet evaluation with external variables support plus the following native functions:
 
-### Environment Functions
+#### Environment
 | Function | Description | Example |
 |----------|-------------|---------|
 | `env(name, default)` | Get environment variable with default | [📖](#environment-functions) |
 | `must_env(name)` | Get required environment variable | [📖](#environment-functions) |
 | `env_parse(content)` | Parse .env format string | [📖](#environment-functions) |
 
-### Time Functions
+#### Time
 | Function | Description | Example |
 |----------|-------------|---------|
 | `now()` | Get current Unix timestamp | [📖](#time-functions) |
 | `time_format(timestamp, format)` | Format timestamp with Go layout | [📖](#time-functions) |
 
-### Base64 Functions
+#### Base64
 | Function | Description | Example |
 |----------|-------------|---------|
 | `base64(data)` | Standard Base64 encoding | [📖](#base64-functions) |
 | `base64url(data)` | URL-safe Base64 encoding | [📖](#base64-functions) |
 
-### Hash Functions
+#### Hash
 | Function | Description | Example |
 |----------|-------------|---------|
 | `md5(data)` | MD5 hash of string | [📖](#hash-functions) |
@@ -37,24 +37,24 @@ jsonnet-armed provides standard Jsonnet evaluation with external variables suppo
 | `sha256_file(filename)` | SHA-256 hash of file content | [📖](#hash-functions) |
 | `sha512_file(filename)` | SHA-512 hash of file content | [📖](#hash-functions) |
 
-### UUID Functions
+#### UUID
 | Function | Description | Example |
 |----------|-------------|---------|
 | `uuid_v4()` | Generate random UUID v4 | [📖](#uuid-functions) |
 | `uuid_v7()` | Generate time-based UUID v7 | [📖](#uuid-functions) |
 
-### HTTP Functions
+#### HTTP
 | Function | Description | Example |
 |----------|-------------|---------|
 | `http_get(url, headers)` | Make HTTP GET request | [📖](#http-functions) |
 | `http_request(method, url, headers, body)` | Make HTTP request with method | [📖](#http-functions) |
 
-### DNS Functions
+#### DNS
 | Function | Description | Example |
 |----------|-------------|---------|
 | `dns_lookup(hostname, record_type)` | DNS lookup for various record types | [📖](#dns-functions) |
 
-### Regular Expression Functions
+#### Regular Expression
 | Function | Description | Example |
 |----------|-------------|---------|
 | `regex_match(pattern, text)` | Check if text matches pattern | [📖](#regular-expression-functions) |
@@ -63,18 +63,18 @@ jsonnet-armed provides standard Jsonnet evaluation with external variables suppo
 | `regex_replace(pattern, replacement, text)` | Replace all matches | [📖](#regular-expression-functions) |
 | `regex_split(pattern, text)` | Split text by pattern | [📖](#regular-expression-functions) |
 
-### JQ Functions
+#### JQ
 | Function | Description | Example |
 |----------|-------------|---------|
 | `jq(query, input)` | Execute jq query on JSON data | [📖](#jq-functions) |
 
-### External Command Execution
+#### Exec
 | Function | Description | Example |
 |----------|-------------|---------|
 | `exec(command, args)` | Execute command with arguments | [📖](#external-command-execution) |
 | `exec_with_env(command, args, env)` | Execute command with custom environment | [📖](#external-command-execution) |
 
-### File Functions
+#### File
 | Function | Description | Example |
 |----------|-------------|---------|
 | `file_content(filename)` | Read file content as string | [📖](#file-functions) |
