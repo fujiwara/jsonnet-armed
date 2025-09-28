@@ -4,18 +4,82 @@ A Jsonnet rendering tool with additional useful functions.
 
 ## Features
 
-- Standard Jsonnet evaluation with external variables support
-- [Environment variable access functions](#environment-functions) (`env`, `must_env`)
-- [Time functions](#time-functions) for current timestamp and formatting
-- [Base64 encoding functions](#base64-functions) (standard and URL-safe)
-- [Hash functions](#hash-functions) for cryptographic operations
-- [UUID functions](#uuid-functions) for generating UUIDs (v4 and v7)
-- [HTTP functions](#http-functions) for making HTTP requests
-- [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
-- [Regular expression functions](#regular-expression-functions) for pattern matching and text manipulation
-- [JQ functions](#jq-functions) for JSON data processing and transformation
-- [External command execution](#external-command-execution) with timeout and cancellation
-- [File functions](#file-functions) for reading content and metadata
+jsonnet-armed provides standard Jsonnet evaluation with external variables support plus the following native functions:
+
+### Environment Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `env(name, default)` | Get environment variable with default | [📖](#environment-functions) |
+| `must_env(name)` | Get required environment variable | [📖](#environment-functions) |
+| `env_parse(content)` | Parse .env format string | [📖](#environment-functions) |
+
+### Time Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `now()` | Get current Unix timestamp | [📖](#time-functions) |
+| `time_format(timestamp, format)` | Format timestamp with Go layout | [📖](#time-functions) |
+
+### Base64 Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `base64(data)` | Standard Base64 encoding | [📖](#base64-functions) |
+| `base64url(data)` | URL-safe Base64 encoding | [📖](#base64-functions) |
+
+### Hash Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `md5(data)` | MD5 hash of string | [📖](#hash-functions) |
+| `sha1(data)` | SHA-1 hash of string | [📖](#hash-functions) |
+| `sha256(data)` | SHA-256 hash of string | [📖](#hash-functions) |
+| `sha512(data)` | SHA-512 hash of string | [📖](#hash-functions) |
+| `md5_file(filename)` | MD5 hash of file content | [📖](#hash-functions) |
+| `sha1_file(filename)` | SHA-1 hash of file content | [📖](#hash-functions) |
+| `sha256_file(filename)` | SHA-256 hash of file content | [📖](#hash-functions) |
+| `sha512_file(filename)` | SHA-512 hash of file content | [📖](#hash-functions) |
+
+### UUID Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `uuid_v4()` | Generate random UUID v4 | [📖](#uuid-functions) |
+| `uuid_v7()` | Generate time-based UUID v7 | [📖](#uuid-functions) |
+
+### HTTP Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `http_get(url, headers)` | Make HTTP GET request | [📖](#http-functions) |
+| `http_request(method, url, headers, body)` | Make HTTP request with method | [📖](#http-functions) |
+
+### DNS Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `dns_lookup(hostname, record_type)` | DNS lookup for various record types | [📖](#dns-functions) |
+
+### Regular Expression Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `regex_match(pattern, text)` | Check if text matches pattern | [📖](#regular-expression-functions) |
+| `regex_find(pattern, text)` | Find first match | [📖](#regular-expression-functions) |
+| `regex_find_all(pattern, text)` | Find all matches | [📖](#regular-expression-functions) |
+| `regex_replace(pattern, replacement, text)` | Replace all matches | [📖](#regular-expression-functions) |
+| `regex_split(pattern, text)` | Split text by pattern | [📖](#regular-expression-functions) |
+
+### JQ Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `jq(query, input)` | Execute jq query on JSON data | [📖](#jq-functions) |
+
+### External Command Execution
+| Function | Description | Example |
+|----------|-------------|---------|
+| `exec(command, args)` | Execute command with arguments | [📖](#external-command-execution) |
+| `exec_with_env(command, args, env)` | Execute command with custom environment | [📖](#external-command-execution) |
+
+### File Functions
+| Function | Description | Example |
+|----------|-------------|---------|
+| `file_content(filename)` | Read file content as string | [📖](#file-functions) |
+| `file_stat(filename)` | Get file metadata as object | [📖](#file-functions) |
+| `file_exists(filename)` | Check if file exists | [📖](#file-functions) |
 
 ## Installation
 
