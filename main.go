@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/fujiwara/jsonnet-armed/functions"
@@ -128,7 +131,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 			if cachedResult, isStale, exists := cache.GetWithStale(cacheKey); exists {
 				if !isStale {
 					// Use fresh cached result
-					err = cli.writeOutput(cachedResult)
+					err = cli.writeOutput(ctx, cachedResult)
 					return result{jsonStr: cachedResult, err: err}
 				}
 				// Store stale content for potential fallback
@@ -146,7 +149,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 			slog.Warn("Evaluation failed, using stale cache",
 				"error", err.Error(),
 				"filename", cli.Filename)
-			err = cli.writeOutput(staleContent)
+			err = cli.writeOutput(ctx, staleContent)
 			return result{jsonStr: staleContent, err: err}
 		}
 		return result{jsonStr: "", err: err}
@@ -164,7 +167,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 	}
 
 	// Write output within the timeout scope
-	err = cli.writeOutput(jsonStr)
+	err = cli.writeOutput(ctx, jsonStr)
 	return result{jsonStr: jsonStr, err: err}
 }
 
@@ -204,19 +207,46 @@ func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (str
 	return jsonStr, nil
 }
 
-func (cli *CLI) writeOutput(jsonStr string) error {
-	if cli.OutputFile != "" {
-		data := []byte(jsonStr)
-
-		// Check if content has changed when WriteIfChanged is enabled
-		if cli.WriteIfChanged && shouldSkipWrite(cli.OutputFile, data) {
-			return nil
-		}
-
-		return writeFileAtomic(cli.OutputFile, data, 0644)
+func (cli *CLI) writeOutputToHTTP(ctx context.Context, u string, jsonStr string) error {
+	// Write to HTTP(S) URL
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(jsonStr))
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
-	_, err := io.WriteString(cli.writer, jsonStr)
-	return err
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "jsonnet-armed/"+Version)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func (cli *CLI) writeOutput(ctx context.Context, jsonStr string) error {
+	out := cli.Output
+	if out == "" {
+		_, err := io.WriteString(cli.writer, jsonStr)
+		return err
+	}
+
+	// Check if output is an HTTP(S) URL
+	u, err := url.Parse(out)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		return cli.writeOutputToHTTP(ctx, out, jsonStr)
+	}
+
+	// Write to file
+	data := []byte(jsonStr)
+	// Check if content has changed when WriteIfChanged is enabled
+	if cli.WriteIfChanged && shouldSkipWrite(cli.Output, data) {
+		return nil
+	}
+	return writeFileAtomic(cli.Output, data, 0644)
 }
 
 // shouldSkipWrite checks if the file write should be skipped because content hasn't changed

@@ -32,7 +32,9 @@ jsonnet-armed [options] <jsonnet-file>
 
 #### Options
 
-- `-o, --output-file <file>`: Write output to file instead of stdout (uses atomic writes to prevent corruption)
+- `-o, --output <target>`: Write output to file or HTTP(S) URL instead of stdout
+  - File output uses atomic writes to prevent corruption
+  - HTTP(S) output sends JSON via POST request with Content-Type: application/json
 - `--write-if-changed`: Write output file only if content has changed (compares using file size and SHA256 hash)
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
@@ -50,6 +52,12 @@ jsonnet-armed input.jsonnet
 
 # Write output to file
 jsonnet-armed -o output.json input.jsonnet
+
+# Send output to HTTP endpoint
+jsonnet-armed -o http://localhost:8080/webhook input.jsonnet
+
+# Send output to HTTPS endpoint
+jsonnet-armed -o https://api.example.com/config input.jsonnet
 ```
 
 With external variables:
@@ -77,6 +85,12 @@ jsonnet-armed --cache 1h -V env=production large-config.jsonnet
 
 # Use stale cache fallback for reliability
 jsonnet-armed --cache 5m --stale 10m config.jsonnet
+
+# Send output to webhook with external variables
+jsonnet-armed -o https://webhook.site/unique-url -V env=prod config.jsonnet
+
+# Use with timeout when sending to HTTP endpoint
+jsonnet-armed -o http://localhost:3000/api/config -t 30s config.jsonnet
 ```
 
 #### Cache Feature

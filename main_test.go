@@ -2,10 +2,11 @@ package armed_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,7 +32,7 @@ func (sw *slowWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestRunWithCLI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name        string
@@ -231,7 +232,7 @@ func TestRunWithCLI(t *testing.T) {
 }
 
 func TestRunWithCLIOutputToFile(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	tests := []struct {
@@ -273,10 +274,10 @@ func TestRunWithCLIOutputToFile(t *testing.T) {
 
 			// Create CLI config
 			cli := &armed.CLI{
-				Filename:   jsonnetFile,
-				OutputFile: outputFile,
-				ExtStr:     tt.extStr,
-				ExtCode:    tt.extCode,
+				Filename: jsonnetFile,
+				Output:   outputFile,
+				ExtStr:   tt.extStr,
+				ExtCode:  tt.extCode,
 			}
 
 			// Run evaluation
@@ -297,7 +298,7 @@ func TestRunWithCLIOutputToFile(t *testing.T) {
 }
 
 func TestRunWithCLIFromStdin(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name        string
@@ -421,7 +422,7 @@ func compareJSON(t *testing.T, got, want string) {
 }
 
 func TestRunWithCLITimeout(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name        string
@@ -514,7 +515,7 @@ func TestRunWithCLITimeout(t *testing.T) {
 }
 
 func TestRunWithCLITimeoutFromStdin(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name        string
@@ -609,7 +610,7 @@ func TestRunWithCLITimeoutFromStdin(t *testing.T) {
 }
 
 func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name        string
@@ -698,7 +699,7 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 // TestAtomicFileWrite tests that file writing is atomic
 // TestWriteIfChanged tests the --write-if-changed functionality
 func TestWriteIfChanged(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	t.Run("write new file", func(t *testing.T) {
@@ -712,7 +713,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			OutputFile:     outputFile,
+			Output:         outputFile,
 			WriteIfChanged: true,
 		}
 
@@ -759,7 +760,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			OutputFile:     outputFile,
+			Output:         outputFile,
 			WriteIfChanged: true,
 		}
 
@@ -808,7 +809,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			OutputFile:     outputFile,
+			Output:         outputFile,
 			WriteIfChanged: true,
 		}
 
@@ -861,7 +862,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			OutputFile:     outputFile,
+			Output:         outputFile,
 			WriteIfChanged: true,
 		}
 
@@ -918,7 +919,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			OutputFile:     outputFile,
+			Output:         outputFile,
 			WriteIfChanged: false, // Explicitly disabled (default)
 		}
 
@@ -939,7 +940,7 @@ func TestWriteIfChanged(t *testing.T) {
 }
 
 func TestAtomicFileWrite(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	// Test concurrent writes to ensure atomicity
@@ -964,8 +965,8 @@ func TestAtomicFileWrite(t *testing.T) {
 				defer wg.Done()
 
 				cli := &armed.CLI{
-					Filename:   jsonnetFile,
-					OutputFile: outputFile,
+					Filename: jsonnetFile,
+					Output:   outputFile,
 				}
 
 				if err := cli.Run(ctx); err != nil {
@@ -1010,8 +1011,8 @@ func TestAtomicFileWrite(t *testing.T) {
 		}
 
 		cli := &armed.CLI{
-			Filename:   jsonnetFile,
-			OutputFile: outputFile,
+			Filename: jsonnetFile,
+			Output:   outputFile,
 		}
 
 		if err := cli.Run(ctx); err != nil {
@@ -1042,8 +1043,8 @@ func TestAtomicFileWrite(t *testing.T) {
 		}
 
 		cli := &armed.CLI{
-			Filename:   jsonnetFile,
-			OutputFile: outputFile,
+			Filename: jsonnetFile,
+			Output:   outputFile,
 		}
 
 		if err := cli.Run(ctx); err != nil {
@@ -1075,8 +1076,8 @@ func TestAtomicFileWrite(t *testing.T) {
 		}
 
 		cli := &armed.CLI{
-			Filename:   jsonnetFile,
-			OutputFile: outputFile,
+			Filename: jsonnetFile,
+			Output:   outputFile,
 		}
 
 		err := cli.Run(ctx)
@@ -1089,4 +1090,143 @@ func TestAtomicFileWrite(t *testing.T) {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
+}
+
+func TestRunWithCLIOutputToHTTP(t *testing.T) {
+	tests := []struct {
+		name         string
+		jsonnet      string
+		expectedJSON string
+		expectError  bool
+		statusCode   int
+	}{
+		{
+			name:         "Simple output to HTTP",
+			jsonnet:      `{hello: "world"}`,
+			expectedJSON: `{"hello": "world"}`,
+			statusCode:   200,
+		},
+		{
+			name:         "Output with external variables to HTTP",
+			jsonnet:      `{message: std.extVar("msg")}`,
+			expectedJSON: `{"message": "test"}`,
+			statusCode:   200,
+		},
+		{
+			name:         "Server returns error",
+			jsonnet:      `{hello: "world"}`,
+			expectedJSON: `{"hello": "world"}`,
+			expectError:  true,
+			statusCode:   500,
+		},
+		{
+			name:         "Server returns 404",
+			jsonnet:      `{hello: "world"}`,
+			expectedJSON: `{"hello": "world"}`,
+			expectError:  true,
+			statusCode:   404,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test HTTP server
+			var receivedBody []byte
+			var receivedHeaders http.Header
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedHeaders = r.Header
+				body, _ := io.ReadAll(r.Body)
+				receivedBody = body
+				w.WriteHeader(tt.statusCode)
+				if tt.statusCode >= 400 {
+					w.Write([]byte("Error response"))
+				}
+			}))
+			defer server.Close()
+
+			// Create temp Jsonnet file
+			tmpDir := t.TempDir()
+			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+
+			// Create CLI config
+			cli := &armed.CLI{
+				Filename: jsonnetFile,
+				Output:   server.URL,
+			}
+
+			// Add external variables if needed
+			if strings.Contains(tt.jsonnet, "std.extVar") {
+				cli.ExtStr = map[string]string{"msg": "test"}
+			}
+
+			ctx := t.Context()
+			err := cli.Run(ctx)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+
+				// Verify received body
+				var gotJSON, wantJSON interface{}
+				if err := json.Unmarshal(receivedBody, &gotJSON); err != nil {
+					t.Fatalf("Failed to unmarshal received JSON: %v", err)
+				}
+				if err := json.Unmarshal([]byte(tt.expectedJSON), &wantJSON); err != nil {
+					t.Fatalf("Failed to unmarshal expected JSON: %v", err)
+				}
+				if diff := cmp.Diff(wantJSON, gotJSON); diff != "" {
+					t.Errorf("JSON mismatch (-want +got):\n%s", diff)
+				}
+
+				// Verify headers
+				if ct := receivedHeaders.Get("Content-Type"); ct != "application/json" {
+					t.Errorf("Expected Content-Type: application/json, got: %s", ct)
+				}
+				if ua := receivedHeaders.Get("User-Agent"); !strings.HasPrefix(ua, "jsonnet-armed/") {
+					t.Errorf("Expected User-Agent to start with jsonnet-armed/, got: %s", ua)
+				}
+			}
+		})
+	}
+}
+
+func TestRunWithCLIOutputToHTTPS(t *testing.T) {
+	// Create a test HTTPS server
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	// Create temp Jsonnet file
+	tmpDir := t.TempDir()
+	jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+	content := `{secure: true}`
+	if err := os.WriteFile(jsonnetFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Create CLI config
+	cli := &armed.CLI{
+		Filename: jsonnetFile,
+		Output:   server.URL, // This is already an HTTPS URL from NewTLSServer
+	}
+
+	// Note: This test will fail because the test server uses a self-signed certificate.
+	// In a real scenario, you would configure the HTTP client to accept the certificate.
+	ctx := t.Context()
+	err := cli.Run(ctx)
+
+	// We expect an error due to certificate verification
+	if err == nil {
+		t.Errorf("Expected certificate error but got none")
+	}
 }
