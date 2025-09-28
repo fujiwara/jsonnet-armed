@@ -13,6 +13,7 @@ A Jsonnet rendering tool with additional useful functions.
 - [HTTP functions](#http-functions) for making HTTP requests
 - [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
 - [Regular expression functions](#regular-expression-functions) for pattern matching and text manipulation
+- [JQ functions](#jq-functions) for JSON data processing and transformation
 - [External command execution](#external-command-execution) with timeout and cancellation
 - [File functions](#file-functions) for reading content and metadata
 
@@ -1006,6 +1007,71 @@ Regular expressions use Go's RE2 syntax, which includes:
 Regular expression functions will return an error (causing Jsonnet evaluation to fail) for:
 - Invalid regular expression patterns
 - Non-string arguments for pattern, replacement, or text parameters
+
+### JQ Functions
+
+Process and transform JSON data using jq query syntax with the power of the Go `gojq` library.
+
+Available jq function:
+- `jq(query, input)`: Execute jq query on input data (returns transformed data)
+
+The jq function provides powerful JSON processing capabilities similar to the popular `jq` command-line tool:
+- Field access and nested object traversal
+- Array filtering, mapping, and transformation
+- Complex data restructuring and aggregation
+- Conditional processing and value selection
+
+```jsonnet
+local jq = std.native("jq");
+
+{
+  // Simple field access
+  name: jq(".name", { name: "Alice", age: 30 }),                    // "Alice"
+
+  // Array filtering and transformation
+  adults: jq(".[] | select(.age >= 18)", [
+    { name: "Alice", age: 30 },
+    { name: "Bob", age: 16 },
+    { name: "Charlie", age: 25 }
+  ]),                                                               // [{ name: "Alice", age: 30 }, { name: "Charlie", age: 25 }]
+
+  // Data restructuring
+  summary: jq("{
+    total_users: length,
+    names: [.[].name],
+    avg_age: (map(.age) | add / length)
+  }", user_data),
+
+  // Complex nested queries
+  first_item: jq(".data.items[0].value", {
+    data: { items: [{ value: "first" }, { value: "second" }] }
+  }),                                                               // "first"
+
+  // Array mapping with calculations
+  doubled: jq("[.[] | . * 2]", [1, 2, 3, 4]),                    // [2, 4, 6, 8]
+
+  // Conditional transformations
+  processed: jq("map(if .status == \"active\" then .name else empty end)", status_list),
+
+  // Grouping and aggregation
+  by_category: jq("group_by(.category) | map({
+    category: .[0].category,
+    count: length,
+    items: map(.name)
+  })", items_with_categories),
+}
+```
+
+The jq function returns:
+- Single values for queries that produce one result
+- Arrays for queries that produce multiple results
+- `null` for queries that produce no results
+- Structured data (objects/arrays) for complex transformations
+
+Error handling:
+- Invalid jq syntax will cause Jsonnet evaluation to fail with a descriptive error
+- Non-string query arguments will return an error
+- Query execution errors (e.g., accessing non-existent fields) will return an error
 
 ### File Functions
 Access file content and metadata directly from Jsonnet.
