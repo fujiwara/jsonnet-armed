@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.12](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.11...v0.0.12) - 2025-09-28
+- Add --stdout flag to output to both file/HTTP and stdout by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/43
+- Add warning when --write-if-changed is used with HTTP output by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/45
+
 ## [v0.0.11](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.10...v0.0.11) - 2025-09-28
 - Add jq function for JSON data processing by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/41
 
