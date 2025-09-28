@@ -234,6 +234,11 @@ func (cli *CLI) writeOutput(ctx context.Context, jsonStr string) error {
 		return err
 	}
 
+	// Also write to stdout if enabled
+	if cli.Stdout {
+		defer io.WriteString(os.Stdout, jsonStr)
+	}
+
 	// Check if output is an HTTP(S) URL
 	u, err := url.Parse(out)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
