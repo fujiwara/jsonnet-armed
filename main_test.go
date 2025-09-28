@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,8 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fujiwara/jsonnet-armed"
+	armed "github.com/fujiwara/jsonnet-armed"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-jsonnet"
+	"github.com/google/go-jsonnet/ast"
 )
 
 // slowWriter simulates a slow output writer that blocks during Write
@@ -35,6 +38,7 @@ func TestRunWithCLI(t *testing.T) {
 		jsonnet     string
 		extStr      map[string]string
 		extCode     map[string]string
+		functions   []*jsonnet.NativeFunction
 		expected    string
 		expectError bool
 	}{
@@ -155,6 +159,33 @@ func TestRunWithCLI(t *testing.T) {
 			}`,
 			expectError: true,
 		},
+		{
+			name: "user defined function",
+			jsonnet: `
+			local hello = std.native("hello");
+			local armed = import 'armed.libsonnet';
+			{
+				foo: hello("world"),
+				baz: armed.hello("jsonnet"),
+			}`,
+			expected: `{
+				"foo": "Hello, world!",
+				"baz": "Hello, jsonnet!"
+			}`,
+			functions: []*jsonnet.NativeFunction{
+				{
+					Name:   "hello",
+					Params: []ast.Identifier{"name"},
+					Func: func(args []any) (any, error) {
+						name, ok := args[0].(string)
+						if !ok {
+							return nil, fmt.Errorf("invalid argument: %v", args[0])
+						}
+						return fmt.Sprintf("Hello, %s!", name), nil
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -176,6 +207,7 @@ func TestRunWithCLI(t *testing.T) {
 				ExtCode:  tt.extCode,
 			}
 			cli.SetWriter(&output)
+			cli.AddFunctions(tt.functions...)
 
 			// Run evaluation
 			err := cli.Run(ctx)

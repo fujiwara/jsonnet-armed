@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/google/go-jsonnet"
 )
 
 type CLI struct {
@@ -24,4 +25,7 @@ type CLI struct {
 
 	// cacheKey holds the generated cache key (internal use)
 	cacheKey string `kong:"-"`
+
+	// functions holds additional native functions to be added to the Jsonnet VM
+	functions []*jsonnet.NativeFunction `kong:"-"`
 }
