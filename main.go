@@ -208,6 +208,11 @@ func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (str
 }
 
 func (cli *CLI) writeOutputToHTTP(ctx context.Context, u string, jsonStr string) error {
+	// Warn if --write-if-changed is used with HTTP output
+	if cli.WriteIfChanged {
+		fmt.Fprintf(os.Stderr, "Warning: --write-if-changed has no effect when outputting to HTTP(S) URL\n")
+	}
+
 	// Write to HTTP(S) URL
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(jsonStr))
 	if err != nil {
