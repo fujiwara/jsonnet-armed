@@ -27,6 +27,11 @@ func (cli *CLI) SetWriter(w io.Writer) {
 	cli.writer = w
 }
 
+// AddFunctions adds custom native functions to the CLI
+func (cli *CLI) AddFunctions(funcs ...*jsonnet.NativeFunction) {
+	cli.functions = append(cli.functions, funcs...)
+}
+
 func Run(ctx context.Context) error {
 	cli := &CLI{writer: os.Stdout}
 	kong.Parse(cli, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
@@ -169,6 +174,7 @@ func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (str
 	// Register native functions
 	ctx = context.WithValue(ctx, "version", Version)
 	funcs := functions.GenerateAllFunctions(ctx)
+	funcs = append(funcs, cli.functions...) // Add user-defined functions
 	for _, f := range funcs {
 		vm.NativeFunction(f)
 	}

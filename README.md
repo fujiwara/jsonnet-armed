@@ -252,6 +252,72 @@ if err := cli.Run(ctx); err != nil {
 }
 ```
 
+#### Adding Custom Native Functions
+
+You can extend jsonnet-armed with your own native functions when using it as a library:
+
+```go
+package main
+
+import (
+    "bytes"
+    "context"
+    "fmt"
+
+    armed "github.com/fujiwara/jsonnet-armed"
+    "github.com/google/go-jsonnet"
+    "github.com/google/go-jsonnet/ast"
+)
+
+func main() {
+    // Create CLI instance
+    cli := &armed.CLI{
+        Filename: "config.jsonnet",
+    }
+
+    // Add custom native functions
+    cli.AddFunctions(
+        &jsonnet.NativeFunction{
+            Name:   "hello",
+            Params: []ast.Identifier{"name"},
+            Func: func(args []any) (any, error) {
+                name, ok := args[0].(string)
+                if !ok {
+                    return nil, fmt.Errorf("invalid argument type")
+                }
+                return fmt.Sprintf("Hello, %s!", name), nil
+            },
+        },
+    )
+
+    // Execute
+    var buf bytes.Buffer
+    cli.SetWriter(&buf)
+
+    ctx := context.Background()
+    if err := cli.Run(ctx); err != nil {
+        panic(err)
+    }
+
+    fmt.Println(buf.String())
+}
+```
+
+Your custom functions can then be used in Jsonnet files:
+
+```jsonnet
+local hello = std.native("hello");
+local armed = import 'armed.libsonnet';
+
+{
+    // Using custom functions directly
+    greeting: hello("World"),           // "Hello, World!"
+
+    // Custom functions are also available in armed library
+    lib_greeting: armed.hello("Armed"), // "Hello, Armed!"
+}
+```
+
 ## Native Functions
 
 jsonnet-armed provides built-in native functions that can be called using `std.native()`.
