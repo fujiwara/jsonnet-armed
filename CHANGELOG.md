@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.0.11](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.10...v0.0.11) - 2025-09-28
+- Add jq function for JSON data processing by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/41
+
 ## [v0.0.10](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.9...v0.0.10) - 2025-09-28
 - Add support for custom native functions in library usage by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/38
 - feat: Add HTTP/HTTPS output support by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/40
