@@ -63,3 +63,11 @@ func getRegexpFunction(name string) (func([]any) (any, error), error) {
 	}
 	return f.Func, nil
 }
+
+func getJQFunction(name string) (func([]any) (any, error), error) {
+	f, ok := functions.JQFunctions[name]
+	if !ok {
+		return nil, fmt.Errorf("jq function %s not found", name)
+	}
+	return f.Func, nil
+}
