@@ -460,6 +460,43 @@ func TestIntegrationExamples(t *testing.T) {
 				"uuid_v7_2": "<valid_uuid_v7>",
 			},
 		},
+		{
+			name: "jq function example",
+			jsonnet: `
+			local jq = std.native("jq");
+			{
+				// Simple field access
+				field_access: jq(".name", { name: "Alice", age: 30 }),
+				// Array filtering
+				filter_array: jq(".[] | select(. > 2)", [1, 2, 3, 4, 5]),
+				// Complex query with object manipulation
+				complex_query: jq("{name: .user, id: .id}", { user: "Bob", id: 123, extra: "data" }),
+				// Array mapping
+				map_array: jq("[.[] | . * 2]", [1, 2, 3]),
+				// Nested field access
+				nested_access: jq(".data.items[0].value", {
+					data: {
+						items: [
+							{ value: "first", index: 0 },
+							{ value: "second", index: 1 }
+						]
+					}
+				}),
+				// Empty result case
+				empty_result: jq(".nonexistent", { foo: "bar" }),
+			}`,
+			expected: map[string]interface{}{
+				"field_access": "Alice",
+				"filter_array": []interface{}{float64(3), float64(4), float64(5)},
+				"complex_query": map[string]interface{}{
+					"name": "Bob",
+					"id":   float64(123),
+				},
+				"map_array":     []interface{}{float64(2), float64(4), float64(6)},
+				"nested_access": "first",
+				"empty_result":  nil,
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -4,17 +4,82 @@ A Jsonnet rendering tool with additional useful functions.
 
 ## Features
 
-- Standard Jsonnet evaluation with external variables support
-- [Environment variable access functions](#environment-functions) (`env`, `must_env`)
-- [Time functions](#time-functions) for current timestamp and formatting
-- [Base64 encoding functions](#base64-functions) (standard and URL-safe)
-- [Hash functions](#hash-functions) for cryptographic operations
-- [UUID functions](#uuid-functions) for generating UUIDs (v4 and v7)
-- [HTTP functions](#http-functions) for making HTTP requests
-- [DNS functions](#dns-functions) for DNS lookups including modern HTTPS records
-- [Regular expression functions](#regular-expression-functions) for pattern matching and text manipulation
-- [External command execution](#external-command-execution) with timeout and cancellation
-- [File functions](#file-functions) for reading content and metadata
+jsonnet-armed provides standard Jsonnet evaluation with external variables support plus the following native functions:
+
+#### Environment
+| Function | Description | Example |
+|----------|-------------|---------|
+| `env(name, default)` | Get environment variable with default | [📖](#environment-functions) |
+| `must_env(name)` | Get required environment variable | [📖](#environment-functions) |
+| `env_parse(content)` | Parse .env format string | [📖](#environment-functions) |
+
+#### Time
+| Function | Description | Example |
+|----------|-------------|---------|
+| `now()` | Get current Unix timestamp | [📖](#time-functions) |
+| `time_format(timestamp, format)` | Format timestamp with Go layout | [📖](#time-functions) |
+
+#### Base64
+| Function | Description | Example |
+|----------|-------------|---------|
+| `base64(data)` | Standard Base64 encoding | [📖](#base64-functions) |
+| `base64url(data)` | URL-safe Base64 encoding | [📖](#base64-functions) |
+
+#### Hash
+| Function | Description | Example |
+|----------|-------------|---------|
+| `md5(data)` | MD5 hash of string | [📖](#hash-functions) |
+| `sha1(data)` | SHA-1 hash of string | [📖](#hash-functions) |
+| `sha256(data)` | SHA-256 hash of string | [📖](#hash-functions) |
+| `sha512(data)` | SHA-512 hash of string | [📖](#hash-functions) |
+| `md5_file(filename)` | MD5 hash of file content | [📖](#hash-functions) |
+| `sha1_file(filename)` | SHA-1 hash of file content | [📖](#hash-functions) |
+| `sha256_file(filename)` | SHA-256 hash of file content | [📖](#hash-functions) |
+| `sha512_file(filename)` | SHA-512 hash of file content | [📖](#hash-functions) |
+
+#### UUID
+| Function | Description | Example |
+|----------|-------------|---------|
+| `uuid_v4()` | Generate random UUID v4 | [📖](#uuid-functions) |
+| `uuid_v7()` | Generate time-based UUID v7 | [📖](#uuid-functions) |
+
+#### HTTP
+| Function | Description | Example |
+|----------|-------------|---------|
+| `http_get(url, headers)` | Make HTTP GET request | [📖](#http-functions) |
+| `http_request(method, url, headers, body)` | Make HTTP request with method | [📖](#http-functions) |
+
+#### DNS
+| Function | Description | Example |
+|----------|-------------|---------|
+| `dns_lookup(hostname, record_type)` | DNS lookup for various record types | [📖](#dns-functions) |
+
+#### Regular Expression
+| Function | Description | Example |
+|----------|-------------|---------|
+| `regex_match(pattern, text)` | Check if text matches pattern | [📖](#regular-expression-functions) |
+| `regex_find(pattern, text)` | Find first match | [📖](#regular-expression-functions) |
+| `regex_find_all(pattern, text)` | Find all matches | [📖](#regular-expression-functions) |
+| `regex_replace(pattern, replacement, text)` | Replace all matches | [📖](#regular-expression-functions) |
+| `regex_split(pattern, text)` | Split text by pattern | [📖](#regular-expression-functions) |
+
+#### JQ
+| Function | Description | Example |
+|----------|-------------|---------|
+| `jq(query, input)` | Execute jq query on JSON data | [📖](#jq-functions) |
+
+#### Exec
+| Function | Description | Example |
+|----------|-------------|---------|
+| `exec(command, args)` | Execute command with arguments | [📖](#external-command-execution) |
+| `exec_with_env(command, args, env)` | Execute command with custom environment | [📖](#external-command-execution) |
+
+#### File
+| Function | Description | Example |
+|----------|-------------|---------|
+| `file_content(filename)` | Read file content as string | [📖](#file-functions) |
+| `file_stat(filename)` | Get file metadata as object | [📖](#file-functions) |
+| `file_exists(filename)` | Check if file exists | [📖](#file-functions) |
 
 ## Installation
 
@@ -1006,6 +1071,71 @@ Regular expressions use Go's RE2 syntax, which includes:
 Regular expression functions will return an error (causing Jsonnet evaluation to fail) for:
 - Invalid regular expression patterns
 - Non-string arguments for pattern, replacement, or text parameters
+
+### JQ Functions
+
+Process and transform JSON data using jq query syntax with the power of the Go `gojq` library.
+
+Available jq function:
+- `jq(query, input)`: Execute jq query on input data (returns transformed data)
+
+The jq function provides powerful JSON processing capabilities similar to the popular `jq` command-line tool:
+- Field access and nested object traversal
+- Array filtering, mapping, and transformation
+- Complex data restructuring and aggregation
+- Conditional processing and value selection
+
+```jsonnet
+local jq = std.native("jq");
+
+{
+  // Simple field access
+  name: jq(".name", { name: "Alice", age: 30 }),                    // "Alice"
+
+  // Array filtering and transformation
+  adults: jq(".[] | select(.age >= 18)", [
+    { name: "Alice", age: 30 },
+    { name: "Bob", age: 16 },
+    { name: "Charlie", age: 25 }
+  ]),                                                               // [{ name: "Alice", age: 30 }, { name: "Charlie", age: 25 }]
+
+  // Data restructuring
+  summary: jq("{
+    total_users: length,
+    names: [.[].name],
+    avg_age: (map(.age) | add / length)
+  }", user_data),
+
+  // Complex nested queries
+  first_item: jq(".data.items[0].value", {
+    data: { items: [{ value: "first" }, { value: "second" }] }
+  }),                                                               // "first"
+
+  // Array mapping with calculations
+  doubled: jq("[.[] | . * 2]", [1, 2, 3, 4]),                    // [2, 4, 6, 8]
+
+  // Conditional transformations
+  processed: jq("map(if .status == \"active\" then .name else empty end)", status_list),
+
+  // Grouping and aggregation
+  by_category: jq("group_by(.category) | map({
+    category: .[0].category,
+    count: length,
+    items: map(.name)
+  })", items_with_categories),
+}
+```
+
+The jq function returns:
+- Single values for queries that produce one result
+- Arrays for queries that produce multiple results
+- `null` for queries that produce no results
+- Structured data (objects/arrays) for complex transformations
+
+Error handling:
+- Invalid jq syntax will cause Jsonnet evaluation to fail with a descriptive error
+- Non-string query arguments will return an error
+- Query execution errors (e.g., accessing non-existent fields) will return an error
 
 ### File Functions
 Access file content and metadata directly from Jsonnet.
