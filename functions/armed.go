@@ -48,6 +48,9 @@ func GenerateAllFunctions(ctx context.Context) []*jsonnet.NativeFunction {
 	for _, f := range NetworkFunctions {
 		all = append(all, f)
 	}
+	for _, f := range X509Functions {
+		all = append(all, f)
+	}
 
 	return all
 }
