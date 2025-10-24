@@ -1297,7 +1297,7 @@ local x509_private_key = std.native("x509_private_key");
   validation: {
     local cert = x509_certificate("/etc/ssl/server.crt"),
 
-    // Check expiration
+    // Calculate days until expiration
     expires_in_days: (cert.not_after_unix - std.native("now")()) / 86400,
     is_expired: std.native("now")() > cert.not_after_unix,
     is_valid: std.native("now")() >= cert.not_before_unix
