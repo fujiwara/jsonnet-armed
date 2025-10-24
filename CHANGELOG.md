@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.0.13](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.12...v0.0.13) - 2025-10-24
+- Add net_port_listening function for Linux by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/47
+- Bump Songmu/tagpr from 1.8.1 to 1.9.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/46
+- Add x509_certificate and x509_private_key functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/49
+
 ## [v0.0.12](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.11...v0.0.12) - 2025-09-28
 - Add --stdout flag to output to both file/HTTP and stdout by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/43
 - Add warning when --write-if-changed is used with HTTP output by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/45
