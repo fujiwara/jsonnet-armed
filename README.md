@@ -54,6 +54,11 @@ jsonnet-armed provides standard Jsonnet evaluation with external variables suppo
 |----------|-------------|---------|
 | `dns_lookup(hostname, record_type)` | DNS lookup for various record types | [📖](#dns-functions) |
 
+#### Network
+| Function | Description | Example |
+|----------|-------------|---------|
+| `net_port_listening(protocol, port)` | Check if a port is listening (Linux only) | [📖](#network-functions) |
+
 #### Regular Expression
 | Function | Description | Example |
 |----------|-------------|---------|
