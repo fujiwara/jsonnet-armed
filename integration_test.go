@@ -524,6 +524,65 @@ func TestIntegrationExamples(t *testing.T) {
 				// Cleanup is handled by test server context
 			},
 		},
+		{
+			name: "X509 certificate and private key functions example",
+			jsonnet: `
+			local x509_certificate = std.native("x509_certificate");
+			local x509_private_key = std.native("x509_private_key");
+
+			local cert = x509_certificate("testdata/test-rsa.crt");
+			local key = x509_private_key("testdata/test-rsa.key");
+
+			{
+				// Certificate information
+				cert_subject_cn: cert.subject.common_name,
+				cert_fingerprint_sha256: std.length(cert.fingerprint_sha256) > 0,
+				cert_public_key_fp: std.length(cert.public_key_fingerprint_sha256) > 0,
+				cert_is_ca: cert.is_ca,
+				cert_has_dns_names: std.length(cert.dns_names) > 0,
+
+				// Private key information
+				key_type: key.key_type,
+				key_size: key.key_size,
+				key_public_key_fp: std.length(key.public_key_fingerprint_sha256) > 0,
+
+				// Verify certificate and key pair match
+				keys_match: cert.public_key_fingerprint_sha256 == key.public_key_fingerprint_sha256,
+
+				// ECDSA certificate test
+				ecdsa_cert: {
+					local ecdsa = x509_certificate("testdata/test-ecdsa.crt"),
+					cn: ecdsa.subject.common_name,
+					algorithm: ecdsa.public_key_algorithm,
+				},
+
+				// ECDSA key test
+				ecdsa_key: {
+					local ecdsa_key = x509_private_key("testdata/test-ecdsa.key"),
+					type: ecdsa_key.key_type,
+					curve: ecdsa_key.curve,
+				},
+			}`,
+			expected: map[string]interface{}{
+				"cert_subject_cn":         "test.example.com",
+				"cert_fingerprint_sha256": true,
+				"cert_public_key_fp":      true,
+				"cert_is_ca":              true, // Self-signed certificate
+				"cert_has_dns_names":      true,
+				"key_type":                "RSA",
+				"key_size":                float64(2048),
+				"key_public_key_fp":       true,
+				"keys_match":              true,
+				"ecdsa_cert": map[string]interface{}{
+					"cn":        "ecdsa.example.com",
+					"algorithm": "ECDSA",
+				},
+				"ecdsa_key": map[string]interface{}{
+					"type":  "ECDSA",
+					"curve": "P-256",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

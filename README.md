@@ -86,6 +86,12 @@ jsonnet-armed provides standard Jsonnet evaluation with external variables suppo
 | `file_stat(filename)` | Get file metadata as object | [📖](#file-functions) |
 | `file_exists(filename)` | Check if file exists | [📖](#file-functions) |
 
+#### X.509 Certificate
+| Function | Description | Example |
+|----------|-------------|---------|
+| `x509_certificate(filename)` | Parse X.509 certificate and return detailed information | [📖](#x509-certificate-functions) |
+| `x509_private_key(filename)` | Parse private key and return metadata (without exposing the key) | [📖](#x509-certificate-functions) |
+
 ## Installation
 
 ```bash
@@ -1258,6 +1264,181 @@ local file_exists = std.native("file_exists");
   }
 }
 ```
+
+### X.509 Certificate Functions
+
+Parse and extract information from X.509 certificates and private keys for infrastructure configuration and security validation.
+
+Available X.509 functions:
+- `x509_certificate(filename)`: Parse X.509 certificate (PEM format) and return detailed information
+- `x509_private_key(filename)`: Parse private key (PEM format) and return metadata without exposing the key
+
+**Supported Key Types:**
+- RSA (PKCS#1, PKCS#8)
+- ECDSA (EC PRIVATE KEY, PKCS#8)
+- Ed25519 (PKCS#8)
+
+```jsonnet
+local x509_certificate = std.native("x509_certificate");
+local x509_private_key = std.native("x509_private_key");
+
+{
+  // Parse certificate
+  cert: x509_certificate("/etc/ssl/server.crt"),
+
+  // Parse private key
+  key: x509_private_key("/etc/ssl/server.key"),
+
+  // Verify certificate and key pair match
+  keys_match: x509_certificate("/etc/ssl/server.crt").public_key_fingerprint_sha256
+           == x509_private_key("/etc/ssl/server.key").public_key_fingerprint_sha256,
+
+  // Certificate validation
+  validation: {
+    local cert = x509_certificate("/etc/ssl/server.crt"),
+
+    // Check expiration
+    expires_in_days: (cert.not_after_unix - std.native("now")()) / 86400,
+    is_expired: std.native("now")() > cert.not_after_unix,
+    is_valid: std.native("now")() >= cert.not_before_unix
+           && std.native("now")() <= cert.not_after_unix,
+
+    // Validate domain coverage
+    covers_domain: std.member(cert.dns_names, "example.com"),
+
+    // Check if it's a CA certificate
+    is_ca: cert.is_ca,
+  },
+
+  // Certificate information
+  cert_info: {
+    local cert = x509_certificate("/etc/ssl/server.crt"),
+
+    // Subject information
+    subject_cn: cert.subject.common_name,
+    subject_org: cert.subject.organization,
+
+    // Validity period
+    valid_from: cert.not_before,
+    valid_until: cert.not_after,
+
+    // Alternative names
+    domains: cert.dns_names,
+    ips: cert.ip_addresses,
+
+    // Fingerprints for verification
+    fingerprint_sha256: cert.fingerprint_sha256,
+    public_key_fingerprint: cert.public_key_fingerprint_sha256,
+
+    // Key usage
+    key_usage: cert.key_usage,
+    ext_key_usage: cert.ext_key_usage,
+  },
+
+  // Private key information (without exposing the key itself)
+  key_info: {
+    local key = x509_private_key("/etc/ssl/server.key"),
+
+    type: key.key_type,                    // "RSA", "ECDSA", "Ed25519"
+    size: key.key_size,                    // 2048, 4096, etc. (RSA only)
+    curve: key.curve,                      // "P-256", "P-384", etc. (ECDSA only)
+    public_key_fingerprint: key.public_key_fingerprint_sha256,
+  },
+
+  // Multi-certificate setup validation
+  certs: {
+    local primary_cert = x509_certificate("/etc/ssl/primary.crt"),
+    local backup_cert = x509_certificate("/etc/ssl/backup.crt"),
+    local primary_key = x509_private_key("/etc/ssl/primary.key"),
+
+    // Ensure primary cert and key match
+    primary_valid: primary_cert.public_key_fingerprint_sha256
+                == primary_key.public_key_fingerprint_sha256,
+
+    // Check both certificates cover the same domains
+    same_domains: primary_cert.dns_names == backup_cert.dns_names,
+
+    // Select certificate based on expiration
+    active_cert: if primary_cert.not_after_unix > backup_cert.not_after_unix
+                  then "primary" else "backup",
+  },
+}
+```
+
+**Certificate Object Structure:**
+```jsonnet
+{
+  // Fingerprints
+  fingerprint_sha1: "AA:BB:CC:...",                    // SHA-1 fingerprint
+  fingerprint_sha256: "11:22:33:...",                  // SHA-256 fingerprint (recommended)
+  public_key_fingerprint_sha256: "55:66:77:...",       // Public key fingerprint
+
+  // Subject and Issuer
+  subject: {
+    common_name: "example.com",
+    organization: ["Example Corp"],
+    organizational_unit: ["IT"],
+    country: ["US"],
+    province: ["California"],
+    locality: ["San Francisco"]
+  },
+  issuer: { /* same structure as subject */ },
+
+  // Validity
+  serial_number: "1234567890",
+  not_before: "2024-01-01T00:00:00Z",                  // RFC3339 format
+  not_after: "2025-01-01T00:00:00Z",
+  not_before_unix: 1704067200,                         // Unix timestamp
+  not_after_unix: 1735689600,
+
+  // Alternative Names
+  dns_names: ["example.com", "*.example.com"],
+  ip_addresses: ["192.0.2.1"],
+  email_addresses: ["admin@example.com"],
+
+  // Certificate Properties
+  is_ca: false,
+  version: 3,
+  signature_algorithm: "SHA256-RSA",
+  public_key_algorithm: "RSA",  // "RSA", "ECDSA", "Ed25519"
+
+  // Usage
+  key_usage: ["Digital Signature", "Key Encipherment"],
+  ext_key_usage: ["Server Auth", "Client Auth"]
+}
+```
+
+**Private Key Object Structure:**
+```jsonnet
+{
+  key_type: "RSA",                                     // "RSA", "ECDSA", "Ed25519"
+  key_size: 2048,                                      // RSA key size in bits
+  curve: "P-256",                                      // ECDSA curve name (P-256, P-384, P-521)
+  public_key_fingerprint_sha256: "55:66:77:...",      // Public key fingerprint
+  public_key_pem: "-----BEGIN PUBLIC KEY-----\n..."   // Corresponding public key in PEM format
+}
+```
+
+**Security Notes:**
+- Private key contents are never exposed
+- Only public key information and metadata are returned
+- Fingerprints use industry-standard SHA-256 hashing
+- Certificate and key pair matching is done via public key fingerprint comparison
+
+**Error Handling:**
+Functions return errors in the following cases:
+- File not found or unreadable
+- Invalid PEM format
+- Unsupported certificate or key format
+- Corrupted or malformed data
+
+**Use Cases:**
+- Validate certificate and private key pairs match
+- Check certificate expiration dates
+- Verify domain coverage in certificates
+- Extract certificate fingerprints for pinning
+- Automate certificate rotation checks
+- Ensure multi-certificate setups are correctly configured
 
 ## Building from Source
 
