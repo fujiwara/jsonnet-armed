@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -497,17 +499,47 @@ func TestIntegrationExamples(t *testing.T) {
 				"empty_result":  nil,
 			},
 		},
+		{
+			name: "Network port listening function example",
+			jsonnet: `
+			local net_port_listening = std.native("net_port_listening");
+			local test_port = std.parseInt(std.extVar("TEST_PORT"));
+			{
+				// Check if test TCP port is listening
+				tcp_listening: net_port_listening("tcp", test_port),
+				// Check if a non-listening port
+				not_listening: net_port_listening("tcp", 65534),
+				// Check with different protocols
+				tcp_check: net_port_listening("TCP", test_port),
+			}`,
+			expected: map[string]interface{}{
+				"tcp_listening": true,
+				"not_listening": false,
+				"tcp_check":     true,
+			},
+			setup: func(t *testing.T) string {
+				return startTestTCPServer(t)
+			},
+			cleanup: func(tmpDir string) {
+				// Cleanup is handled by test server context
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var tmpDir string
 			var serverURL string
+			var testPort string
 			if tt.setup != nil {
 				result := tt.setup(t)
 				if strings.HasPrefix(result, "http") {
 					// setup returned server URL
 					serverURL = result
+					tmpDir = t.TempDir()
+				} else if _, err := strconv.Atoi(result); err == nil {
+					// setup returned port number
+					testPort = result
 					tmpDir = t.TempDir()
 				} else {
 					// setup returned tmpDir
@@ -535,6 +567,9 @@ func TestIntegrationExamples(t *testing.T) {
 			}
 			if serverURL != "" {
 				extStr["SERVER_URL"] = serverURL
+			}
+			if testPort != "" {
+				extStr["TEST_PORT"] = testPort
 			}
 
 			cli := &armed.CLI{
@@ -829,4 +864,20 @@ func startTestHTTPServer(t *testing.T) string {
 	t.Cleanup(server.Close)
 
 	return server.URL
+}
+
+// startTestTCPServer starts a test TCP server for integration tests
+// Returns port number as string
+func startTestTCPServer(t *testing.T) string {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to start test TCP server: %v", err)
+	}
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	t.Cleanup(func() {
+		listener.Close()
+	})
+
+	return fmt.Sprintf("%d", port)
 }

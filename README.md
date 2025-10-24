@@ -880,6 +880,64 @@ DNS functions will return an error (causing Jsonnet evaluation to fail) in the f
 - Unsupported record types
 - Network connectivity issues
 
+### Network Functions
+
+Check if network ports are listening on the local system by reading kernel network state.
+
+Available network functions:
+- `net_port_listening(protocol, port)`: Check if a port is listening (returns boolean)
+  - `protocol`: Protocol type - "tcp", "tcp6", "udp", or "udp6" (case-insensitive)
+  - `port`: Port number (1-65535)
+
+**Platform Support:**
+- **Linux only**: This function reads `/proc/net/{tcp,udp,tcp6,udp6}` to check port listening state
+- **Other platforms**: Returns an error "net_port_listening is only supported on Linux"
+
+```jsonnet
+local net_port_listening = std.native("net_port_listening");
+
+{
+  // Check if common service ports are listening
+  ssh_running: net_port_listening("tcp", 22),
+  http_running: net_port_listening("tcp", 80),
+  https_running: net_port_listening("tcp", 443),
+
+  // Check UDP ports
+  dns_running: net_port_listening("udp", 53),
+
+  // Check IPv6 ports
+  http_v6: net_port_listening("tcp6", 80),
+
+  // Conditional configuration based on port availability
+  database: {
+    primary: if net_port_listening("tcp", 5432) then "localhost:5432" else "remote.db.example.com:5432",
+    fallback_required: !net_port_listening("tcp", 5432)
+  },
+
+  // Service health check
+  services_status: {
+    nginx: net_port_listening("tcp", 80),
+    postgres: net_port_listening("tcp", 5432),
+    redis: net_port_listening("tcp", 6379)
+  }
+}
+```
+
+**Important Notes:**
+- This function checks if a port is **listening**, not if it's **connectable**
+- It queries the local kernel state, so it only works for ports on the same machine
+- For checking remote port connectivity, use HTTP functions or implement custom checks via exec functions
+- TCP ports must be in LISTEN state to return `true`
+- UDP ports return `true` if the port is bound (UDP is connectionless, so there's no "LISTEN" state)
+- Protocol names are case-insensitive ("TCP", "tcp", "Tcp" all work)
+
+**Error Handling:**
+The function returns an error in the following cases:
+- Invalid port number (not in range 1-65535)
+- Invalid protocol (not one of: tcp, tcp6, udp, udp6)
+- Failed to read `/proc/net/*` files (permission denied, file not found, etc.)
+- Running on non-Linux platforms
+
 ### External Command Execution
 
 Execute external commands and capture their output, with timeout and cancellation support.
