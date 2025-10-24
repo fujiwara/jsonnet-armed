@@ -178,22 +178,20 @@ func parsePrivateKey(filename string) (any, error) {
 		switch block.Type {
 		case "RSA PRIVATE KEY":
 			privKey, parseErr = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if parseErr == nil {
-				goto parseSuccess
-			}
 		case "EC PRIVATE KEY":
 			privKey, parseErr = x509.ParseECPrivateKey(block.Bytes)
-			if parseErr == nil {
-				goto parseSuccess
-			}
 		case "PRIVATE KEY":
 			privKey, parseErr = x509.ParsePKCS8PrivateKey(block.Bytes)
-			if parseErr == nil {
-				goto parseSuccess
-			}
 		case "EC PARAMETERS":
 			// Skip EC PARAMETERS blocks
 			continue
+		default:
+			continue
+		}
+
+		// If parsing succeeded, we're done
+		if parseErr == nil && privKey != nil {
+			break
 		}
 	}
 
@@ -203,8 +201,6 @@ func parsePrivateKey(filename string) (any, error) {
 		}
 		return nil, fmt.Errorf("no private key found in file")
 	}
-
-parseSuccess:
 
 	result := map[string]any{}
 
