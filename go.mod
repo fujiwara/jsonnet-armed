@@ -21,7 +21,7 @@ require (
 )
 
 require (
-	github.com/alecthomas/kong v1.12.1
+	github.com/alecthomas/kong v1.13.0
 	golang.org/x/crypto v0.42.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
