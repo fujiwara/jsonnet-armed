@@ -1230,3 +1230,107 @@ func TestRunWithCLIOutputToHTTPS(t *testing.T) {
 		t.Errorf("Expected certificate error but got none")
 	}
 }
+
+func TestRunWithCLIDocument(t *testing.T) {
+	ctx := t.Context()
+
+	t.Run("document flag", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{
+			Document: true,
+		}
+		cli.SetWriter(&output)
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Should output the full README content
+		if output.Len() == 0 {
+			t.Error("expected non-empty output for --document")
+		}
+		if !strings.Contains(output.String(), "jsonnet-armed") {
+			t.Error("expected output to contain 'jsonnet-armed'")
+		}
+	})
+
+	t.Run("document-toc flag", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{
+			DocumentToc: true,
+		}
+		cli.SetWriter(&output)
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if output.Len() == 0 {
+			t.Error("expected non-empty output for --document-toc")
+		}
+		// TOC should contain section names
+		if !strings.Contains(output.String(), "Features") {
+			t.Error("expected TOC to contain 'Features'")
+		}
+	})
+
+	t.Run("document-search with match", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{
+			DocumentSearch: "hash",
+		}
+		cli.SetWriter(&output)
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if output.Len() == 0 {
+			t.Error("expected non-empty output for --document-search hash")
+		}
+		if !strings.Contains(output.String(), "Hash") {
+			t.Error("expected output to contain 'Hash'")
+		}
+	})
+
+	t.Run("document-search case insensitive", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{
+			DocumentSearch: "HTTP",
+		}
+		cli.SetWriter(&output)
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if output.Len() == 0 {
+			t.Error("expected non-empty output for --document-search HTTP")
+		}
+	})
+
+	t.Run("document-search no match", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{
+			DocumentSearch: "nonexistent-keyword-xyz-12345",
+		}
+		cli.SetWriter(&output)
+
+		if err := cli.Run(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output.String(), "No sections found matching") {
+			t.Errorf("expected 'No sections found matching' message, got: %s", output.String())
+		}
+	})
+
+	t.Run("no filename without document flags returns error", func(t *testing.T) {
+		var output bytes.Buffer
+		cli := &armed.CLI{}
+		cli.SetWriter(&output)
+
+		err := cli.Run(ctx)
+		if err == nil {
+			t.Error("expected error when no filename and no document flags")
+		}
+		if !strings.Contains(err.Error(), "<filename> is required") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}

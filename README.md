@@ -119,6 +119,9 @@ jsonnet-armed [options] <jsonnet-file>
 - `-c, --cache <duration>`: Cache evaluation results for specified duration (e.g., 5m, 1h)
 - `--stale <duration>`: Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)
 - `-v, --version`: Show version and exit
+- `--document`: Print full documentation and exit
+- `--document-toc`: Print documentation table of contents and exit
+- `--document-search <keyword>`: Search documentation by keyword and print matching sections
 
 #### Examples
 
