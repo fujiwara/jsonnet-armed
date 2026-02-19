@@ -1443,6 +1443,44 @@ Functions return errors in the following cases:
 - Automate certificate rotation checks
 - Ensure multi-certificate setups are correctly configured
 
+## Using with LLMs
+
+jsonnet-armed embeds its full documentation into the binary. LLM agents (such as Claude Code or other AI coding assistants) can query the documentation directly from the CLI without needing access to external files or the internet.
+
+### Available Commands
+
+```bash
+# Show table of contents to understand available features
+jsonnet-armed --document-toc
+
+# Search for specific topics (case-insensitive)
+jsonnet-armed --document-search hash
+jsonnet-armed --document-search "http"
+jsonnet-armed --document-search dns
+
+# Show full documentation
+jsonnet-armed --document
+```
+
+### Recommended Workflow for LLM Agents
+
+1. Run `jsonnet-armed --document-toc` to get an overview of available functions
+2. Run `jsonnet-armed --document-search <keyword>` to look up specific function usage and examples
+3. Use the retrieved documentation to generate correct Jsonnet code with `std.native()` calls
+
+### Example: MCP or Tool Integration
+
+You can configure jsonnet-armed as a tool available to your LLM agent. For example, in a system prompt or tool definition:
+
+```
+To look up jsonnet-armed native functions, run:
+  jsonnet-armed --document-search <topic>
+
+Example topics: env, hash, http, dns, exec, regex, jq, file, x509, uuid, base64, time
+```
+
+This enables the LLM to autonomously discover and correctly use jsonnet-armed's native functions when generating Jsonnet configuration files.
+
 ## Building from Source
 
 ```bash
