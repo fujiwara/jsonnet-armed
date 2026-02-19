@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.0.14](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.13...v0.0.14) - 2026-02-19
+- Rewrite CLAUDE.md for clarity and conciseness by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/65
+- Add --document, --document-toc, --document-search flags by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/67
+- build(deps): bump actions/checkout from 5.0.0 to 6.0.2 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/64
+- build(deps): bump golang.org/x/sys from 0.36.0 to 0.40.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/63
+- build(deps): bump Songmu/tagpr from 1.9.0 to 1.15.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/62
+- build(deps): bump actions/setup-go from 6.0.0 to 6.2.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/60
+- build(deps): bump github.com/alecthomas/kong from 1.12.1 to 1.13.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/53
+- build(deps): bump github.com/miekg/dns from 1.1.68 to 1.1.72 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/61
+- build(deps): bump github.com/itchyny/gojq from 0.12.17 to 0.12.18 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/57
+
 ## [v0.0.13](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.12...v0.0.13) - 2025-10-24
 - Add net_port_listening function for Linux by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/47
 - Bump Songmu/tagpr from 1.8.1 to 1.9.0 by @dependabot[bot] in https://github.com/fujiwara/jsonnet-armed/pull/46
