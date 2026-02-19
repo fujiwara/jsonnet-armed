@@ -31,7 +31,7 @@ func TestIntegrationExamples(t *testing.T) {
 	tests := []struct {
 		name     string
 		jsonnet  string
-		expected map[string]interface{}
+		expected map[string]any
 		extStr   map[string]string
 		extCode  map[string]string
 		setup    func(t *testing.T) string // returns tmpDir if needed
@@ -47,9 +47,9 @@ func TestIntegrationExamples(t *testing.T) {
 				// Can use any JSON value as default
 				config: env("CONFIG", { debug: false })
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"home":   "/tmp",
-				"config": map[string]interface{}{"debug": false},
+				"config": map[string]any{"debug": false},
 			},
 		},
 		{
@@ -66,7 +66,7 @@ func TestIntegrationExamples(t *testing.T) {
 				// Encoding with special characters
 				unicode: base64("こんにちは世界")
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"encoded":  "SGVsbG8sIFdvcmxkIQ==",
 				"empty":    "",
 				"url_safe": "Pz8-Pg==",
@@ -87,7 +87,7 @@ func TestIntegrationExamples(t *testing.T) {
 				// Can be used with variables
 				short_hash: std.substr(sha256("data"), 0, 8)
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"md5_hash":    "5d41402abc4b2a76b9719d911017c592",
 				"sha1_hash":   "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d",
 				"sha256_hash": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
@@ -135,14 +135,14 @@ func TestIntegrationExamples(t *testing.T) {
 
 				return tmpDir
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"readme_exists": false, // README.md won't exist in temp dir
 				"fake_exists":   false,
-				"config": map[string]interface{}{
+				"config": map[string]any{
 					"app":     "test",
 					"version": "1.0",
 				},
-				"file_info": map[string]interface{}{
+				"file_info": map[string]any{
 					"name":   "test_file.txt",
 					"size":   float64(11), // "hello world" is 11 bytes
 					"is_dir": false,
@@ -157,7 +157,7 @@ func TestIntegrationExamples(t *testing.T) {
 				sha256_test: armed.sha256('test'),
 				env_test: armed.env('USER', 'default_user'),
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"sha256_test": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				"env_test":    "testuser",
 			},
@@ -189,7 +189,7 @@ func TestIntegrationExamples(t *testing.T) {
 				"replicas": "3",
 				"debug":    "false",
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"environment": "production",
 				"region":      "us-west-2",
 				"replicas":    float64(3),
@@ -224,20 +224,20 @@ func TestIntegrationExamples(t *testing.T) {
 					year_length: if result.exit_code == 0 then std.length(std.strReplace(result.stdout, "\n", "")) else 0
 				}
 			}`,
-			expected: map[string]interface{}{
-				"hello": map[string]interface{}{
+			expected: map[string]any{
+				"hello": map[string]any{
 					"stdout":    "Hello, World!\n",
 					"stderr":    "",
 					"exit_code": float64(0),
 				},
 				"success": true,
 				"failure": false,
-				"custom_env": map[string]interface{}{
+				"custom_env": map[string]any{
 					"stdout":    "test-value\n",
 					"stderr":    "",
 					"exit_code": float64(0),
 				},
-				"date_result": map[string]interface{}{
+				"date_result": map[string]any{
 					"success":     true,
 					"year_length": float64(4), // YYYY format should be 4 characters
 				},
@@ -257,15 +257,15 @@ func TestIntegrationExamples(t *testing.T) {
 					has_output: std.length(result.stdout) > 0
 				}
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"sha256_test": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				"env_test":    "testuser",
-				"command_result": map[string]interface{}{
+				"command_result": map[string]any{
 					"stdout":    "Hello, World!\n",
 					"stderr":    "",
 					"exit_code": float64(0),
 				},
-				"date_check": map[string]interface{}{
+				"date_check": map[string]any{
 					"success":    true,
 					"has_output": true,
 				},
@@ -293,8 +293,8 @@ func TestIntegrationExamples(t *testing.T) {
 				// Parse with various formats
 				mixed_format: env_parse("SIMPLE=value\nexport EXPORTED=exported_value\n# Comment line\n\nQUOTED=\"quoted value\"\n")
 			}`,
-			expected: map[string]interface{}{
-				"env_from_file": map[string]interface{}{
+			expected: map[string]any{
+				"env_from_file": map[string]any{
 					"DATABASE_URL":  "postgres://user:pass@localhost/db",
 					"API_KEY":       "secret-key-123",
 					"DEBUG":         "true",
@@ -304,15 +304,15 @@ func TestIntegrationExamples(t *testing.T) {
 					"SINGLE_QUOTES": "Another message",
 					"LAST_VAR":      "final_value",
 				},
-				"inline_env": map[string]interface{}{
+				"inline_env": map[string]any{
 					"KEY1": "value1",
 					"KEY2": "value2",
 					"KEY3": "value3",
 				},
 				"database_url": "postgres://user:pass@localhost/db",
 				"api_key":      "secret-key-123",
-				"empty":        map[string]interface{}{},
-				"mixed_format": map[string]interface{}{
+				"empty":        map[string]any{},
+				"mixed_format": map[string]any{
 					"SIMPLE":   "value",
 					"EXPORTED": "exported_value",
 					"QUOTED":   "quoted value",
@@ -333,19 +333,19 @@ func TestIntegrationExamples(t *testing.T) {
 					{"Content-Type": "application/json"},
 					'{"test": "data"}')
 			}`,
-			expected: map[string]interface{}{
-				"get_response": map[string]interface{}{
+			expected: map[string]any{
+				"get_response": map[string]any{
 					"status_code": float64(200),
 					"status":      "200 OK",
-					"headers": map[string]interface{}{
+					"headers": map[string]any{
 						"Content-Type": "application/json",
 					},
 					"body": `{"message": "get"}`,
 				},
-				"post_response": map[string]interface{}{
+				"post_response": map[string]any{
 					"status_code": float64(201),
 					"status":      "201 Created",
-					"headers": map[string]interface{}{
+					"headers": map[string]any{
 						"Content-Type": "application/json",
 					},
 					"body": `{"message": "post"}`,
@@ -373,30 +373,30 @@ func TestIntegrationExamples(t *testing.T) {
 				// PTR record lookup
 				cloudflare_ptr: dns_lookup("1.1.1.1", "PTR"),
 			}`,
-			expected: map[string]interface{}{
-				"google_a": map[string]interface{}{
+			expected: map[string]any{
+				"google_a": map[string]any{
 					"hostname": "google.com",
 					"type":     "A",
 					"success":  true,
-					"records":  []interface{}{"<dynamic_records>"},
+					"records":  []any{"<dynamic_records>"},
 				},
-				"google_mx": map[string]interface{}{
+				"google_mx": map[string]any{
 					"hostname": "google.com",
 					"type":     "MX",
 					"success":  true,
-					"records":  []interface{}{"<dynamic_records>"},
+					"records":  []any{"<dynamic_records>"},
 				},
-				"google_txt": map[string]interface{}{
+				"google_txt": map[string]any{
 					"hostname": "google.com",
 					"type":     "TXT",
 					"success":  true,
-					"records":  []interface{}{"<dynamic_records>"},
+					"records":  []any{"<dynamic_records>"},
 				},
-				"cloudflare_ptr": map[string]interface{}{
+				"cloudflare_ptr": map[string]any{
 					"hostname": "1.1.1.1",
 					"type":     "PTR",
 					"success":  true,
-					"records":  []interface{}{"<dynamic_records>"},
+					"records":  []any{"<dynamic_records>"},
 				},
 			},
 		},
@@ -429,17 +429,17 @@ func TestIntegrationExamples(t *testing.T) {
 				csv_split: regex_split(",", "a,b,c,d"),
 				space_split: regex_split("\\s+", "hello   world  test")
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"is_email":     true,
 				"not_email":    false,
 				"first_number": "123",
 				"no_match":     nil,
-				"all_numbers":  []interface{}{"123", "456", "789"},
-				"all_words":    []interface{}{"hello", "world", "test"},
+				"all_numbers":  []any{"123", "456", "789"},
+				"all_words":    []any{"hello", "world", "test"},
 				"sanitized":    "hello_world___",
 				"clean_spaces": "hello world test",
-				"csv_split":    []interface{}{"a", "b", "c", "d"},
-				"space_split":  []interface{}{"hello", "world", "test"},
+				"csv_split":    []any{"a", "b", "c", "d"},
+				"space_split":  []any{"hello", "world", "test"},
 			},
 		},
 		{
@@ -455,7 +455,7 @@ func TestIntegrationExamples(t *testing.T) {
 				uuid_v7_1: uuid_v7(),
 				uuid_v7_2: uuid_v7(),
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"uuid_v4_1": "<valid_uuid_v4>",
 				"uuid_v4_2": "<valid_uuid_v4>",
 				"uuid_v7_1": "<valid_uuid_v7>",
@@ -487,14 +487,14 @@ func TestIntegrationExamples(t *testing.T) {
 				// Empty result case
 				empty_result: jq(".nonexistent", { foo: "bar" }),
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"field_access": "Alice",
-				"filter_array": []interface{}{float64(3), float64(4), float64(5)},
-				"complex_query": map[string]interface{}{
+				"filter_array": []any{float64(3), float64(4), float64(5)},
+				"complex_query": map[string]any{
 					"name": "Bob",
 					"id":   float64(123),
 				},
-				"map_array":     []interface{}{float64(2), float64(4), float64(6)},
+				"map_array":     []any{float64(2), float64(4), float64(6)},
 				"nested_access": "first",
 				"empty_result":  nil,
 			},
@@ -512,7 +512,7 @@ func TestIntegrationExamples(t *testing.T) {
 				// Check with different protocols
 				tcp_check: net_port_listening("TCP", test_port),
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"tcp_listening": true,
 				"not_listening": false,
 				"tcp_check":     true,
@@ -563,7 +563,7 @@ func TestIntegrationExamples(t *testing.T) {
 					curve: ecdsa_key.curve,
 				},
 			}`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"cert_subject_cn":         "test.example.com",
 				"cert_fingerprint_sha256": true,
 				"cert_public_key_fp":      true,
@@ -573,11 +573,11 @@ func TestIntegrationExamples(t *testing.T) {
 				"key_size":                float64(2048),
 				"key_public_key_fp":       true,
 				"keys_match":              true,
-				"ecdsa_cert": map[string]interface{}{
+				"ecdsa_cert": map[string]any{
 					"cn":        "ecdsa.example.com",
 					"algorithm": "ECDSA",
 				},
-				"ecdsa_key": map[string]interface{}{
+				"ecdsa_key": map[string]any{
 					"type":  "ECDSA",
 					"curve": "P-256",
 				},
@@ -645,7 +645,7 @@ func TestIntegrationExamples(t *testing.T) {
 			}
 
 			// Parse output JSON
-			var result map[string]interface{}
+			var result map[string]any
 			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 				t.Fatalf("failed to parse result JSON: %v\nOutput: %s", err, output.String())
 			}
@@ -660,7 +660,7 @@ func TestIntegrationExamples(t *testing.T) {
 
 // compareWithTimeStampTolerance compares two maps but ignores timestamp fields
 // since they are dynamic and can't be predicted exactly
-func compareWithTimeStampTolerance(expected, actual map[string]interface{}) string {
+func compareWithTimeStampTolerance(expected, actual map[string]any) string {
 	// Make copies to avoid modifying originals
 	expectedCopy := deepCopyMap(expected)
 	actualCopy := deepCopyMap(actual)
@@ -672,11 +672,11 @@ func compareWithTimeStampTolerance(expected, actual map[string]interface{}) stri
 	return cmp.Diff(expectedCopy, actualCopy)
 }
 
-func deepCopyMap(m map[string]interface{}) map[string]interface{} {
-	copy := make(map[string]interface{})
+func deepCopyMap(m map[string]any) map[string]any {
+	copy := make(map[string]any)
 	for k, v := range m {
 		switch val := v.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			copy[k] = deepCopyMap(val)
 		default:
 			copy[k] = val
@@ -685,7 +685,7 @@ func deepCopyMap(m map[string]interface{}) map[string]interface{} {
 	return copy
 }
 
-func normalizeTimestamps(m map[string]interface{}) {
+func normalizeTimestamps(m map[string]any) {
 	timestampPattern := regexp.MustCompile(`^(timestamp|time|mod_time|now)`)
 	uuidV4Pattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 	uuidV7Pattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -709,20 +709,20 @@ func normalizeTimestamps(m map[string]interface{}) {
 			}
 		} else if k == "headers" && v != nil {
 			// Remove dynamic HTTP headers
-			if headersMap, ok := v.(map[string]interface{}); ok {
+			if headersMap, ok := v.(map[string]any); ok {
 				delete(headersMap, "Date")
 				delete(headersMap, "Content-Length") // Can vary based on server implementation
 			}
 		} else if k == "records" && v != nil {
 			// For DNS records, validate structure but don't compare exact values
 			// as they are dynamic (IP addresses, MX records, etc.)
-			if recordsList, ok := v.([]interface{}); ok {
+			if recordsList, ok := v.([]any); ok {
 				// Just verify we have some records
 				if len(recordsList) > 0 {
-					m[k] = []interface{}{"<dynamic_records>"}
+					m[k] = []any{"<dynamic_records>"}
 				}
 			}
-		} else if subMap, ok := v.(map[string]interface{}); ok {
+		} else if subMap, ok := v.(map[string]any); ok {
 			normalizeTimestamps(subMap)
 		}
 	}
@@ -753,7 +753,7 @@ func TestIntegrationCache(t *testing.T) {
 	}
 
 	firstResult := buf1.String()
-	var firstJSON map[string]interface{}
+	var firstJSON map[string]any
 	if err := json.Unmarshal([]byte(firstResult), &firstJSON); err != nil {
 		t.Fatalf("Failed to parse first result: %v", err)
 	}
@@ -777,7 +777,7 @@ func TestIntegrationCache(t *testing.T) {
 	}
 
 	secondResult := buf2.String()
-	var secondJSON map[string]interface{}
+	var secondJSON map[string]any
 	if err := json.Unmarshal([]byte(secondResult), &secondJSON); err != nil {
 		t.Fatalf("Failed to parse second result: %v", err)
 	}
@@ -844,13 +844,13 @@ func TestIntegrationStaleCache(t *testing.T) {
 	}
 
 	firstResult := buf1.String()
-	expected := map[string]interface{}{
+	expected := map[string]any{
 		"value":     "success",
 		"timestamp": "cached",
 		"env_check": "env_value",
 	}
 
-	var firstJSON map[string]interface{}
+	var firstJSON map[string]any
 	if err := json.Unmarshal([]byte(firstResult), &firstJSON); err != nil {
 		t.Fatalf("Failed to parse first result: %v", err)
 	}

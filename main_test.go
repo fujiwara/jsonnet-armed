@@ -406,7 +406,7 @@ func TestRunWithCLIFromStdin(t *testing.T) {
 func compareJSON(t *testing.T, got, want string) {
 	t.Helper()
 
-	var gotJSON, wantJSON interface{}
+	var gotJSON, wantJSON any
 
 	if err := json.Unmarshal([]byte(got), &gotJSON); err != nil {
 		t.Fatalf("failed to parse got JSON: %v\nJSON: %s", err, got)
@@ -505,7 +505,7 @@ func TestRunWithCLITimeout(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				// Should have valid JSON output
-				var result map[string]interface{}
+				var result map[string]any
 				if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 					t.Errorf("output is not valid JSON: %v", err)
 				}
@@ -601,7 +601,7 @@ func TestRunWithCLITimeoutFromStdin(t *testing.T) {
 			}
 
 			// Should have valid JSON output
-			var result map[string]interface{}
+			var result map[string]any
 			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 				t.Errorf("output is not valid JSON: %v", err)
 			}
@@ -687,7 +687,7 @@ func TestRunWithCLITimeoutSlowOutput(t *testing.T) {
 
 			// For successful cases, verify output if it's a buffer
 			if buf, ok := output.(*bytes.Buffer); ok {
-				var result map[string]interface{}
+				var result map[string]any
 				if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 					t.Errorf("output is not valid JSON: %v", err)
 				}
@@ -833,7 +833,7 @@ func TestWriteIfChanged(t *testing.T) {
 			t.Fatalf("failed to read output file: %v", err)
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(content, &result); err != nil {
 			t.Errorf("invalid JSON: %v", err)
 		}
@@ -876,7 +876,7 @@ func TestWriteIfChanged(t *testing.T) {
 			t.Fatalf("failed to read output file: %v", err)
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(content, &result); err != nil {
 			t.Errorf("invalid JSON: %v", err)
 		}
@@ -959,7 +959,7 @@ func TestAtomicFileWrite(t *testing.T) {
 		var wg sync.WaitGroup
 		const numWriters = 5
 
-		for i := 0; i < numWriters; i++ {
+		for i := range numWriters {
 			wg.Add(1)
 			go func(index int) {
 				defer wg.Done()
@@ -985,7 +985,7 @@ func TestAtomicFileWrite(t *testing.T) {
 			t.Fatalf("failed to read output file: %v", err)
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(data, &result); err != nil {
 			t.Errorf("output file contains invalid JSON: %v\nContent: %s", err, string(data))
 		}
@@ -1175,7 +1175,7 @@ func TestRunWithCLIOutputToHTTP(t *testing.T) {
 				}
 
 				// Verify received body
-				var gotJSON, wantJSON interface{}
+				var gotJSON, wantJSON any
 				if err := json.Unmarshal(receivedBody, &gotJSON); err != nil {
 					t.Fatalf("Failed to unmarshal received JSON: %v", err)
 				}
