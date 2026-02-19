@@ -51,6 +51,30 @@ func (cli *CLI) Run(ctx context.Context) error {
 }
 
 func (cli *CLI) run(ctx context.Context) error {
+	// Handle document flags
+	if cli.Document {
+		_, err := io.WriteString(cli.writer, readmeContent)
+		return err
+	}
+	if cli.DocumentToc {
+		_, err := io.WriteString(cli.writer, extractTOC(readmeContent))
+		return err
+	}
+	if cli.DocumentSearch != "" {
+		results := searchSections(readmeContent, cli.DocumentSearch)
+		if results == "" {
+			_, err := fmt.Fprintf(cli.writer, "No sections found matching: %s\n", cli.DocumentSearch)
+			return err
+		}
+		_, err := io.WriteString(cli.writer, results)
+		return err
+	}
+
+	// Filename is required when no document flags are specified
+	if cli.Filename == "" {
+		return fmt.Errorf("<filename> is required")
+	}
+
 	// Initialize cache if enabled
 	var cache *Cache
 	if cli.Cache > 0 {

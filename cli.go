@@ -18,8 +18,11 @@ type CLI struct {
 	Cache          time.Duration     `short:"c" name:"cache" help:"Cache evaluation results for specified duration (e.g., 5m, 1h)"`
 	Stale          time.Duration     `name:"stale" help:"Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)"`
 	Version        kong.VersionFlag  `short:"v" help:"Show version and exit."`
+	Document       bool              `name:"document" help:"Print full documentation and exit."`
+	DocumentToc    bool              `name:"document-toc" help:"Print documentation table of contents and exit."`
+	DocumentSearch string            `name:"document-search" help:"Search documentation by keyword and print matching sections."`
 
-	Filename string `arg:"" name:"filename" help:"Filename or code to execute" type:"path"`
+	Filename string `arg:"" name:"filename" help:"Filename or code to execute" type:"path" optional:""`
 
 	// writer for output (not exposed to CLI, used internally)
 	writer io.Writer `kong:"-"`
