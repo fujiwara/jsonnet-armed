@@ -1,192 +1,85 @@
-# jsonnet-armed Project Guidelines
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-jsonnet-armed is a Jsonnet rendering tool with additional useful functions. It evaluates Jsonnet files and outputs JSON, with support for external variables.
 
-## Code Style and Conventions
-
-### Testing
-- Use table-driven tests for all test cases
-- Test packages should be named with `_test` suffix (e.g., `armed_test`)
-- Use `github.com/google/go-cmp` for JSON comparison
-- Compare JSON outputs by parsing them and using `cmp.Diff` for structural comparison
-- Do not replace `os.Stdout` in tests; use `armed.SetOutput(io.Writer)` instead
-- When adding new native functions, add both unit tests (in `functions/*_test.go`) and integration tests (in `integration_test.go`)
-
-### Test Structure Example
-```go
-tests := []struct {
-    name        string
-    jsonnet     string
-    extStr      map[string]string
-    extCode     map[string]string
-    expected    string
-    expectError bool
-}{
-    // test cases...
-}
-```
-
-### JSON Comparison
-```go
-func compareJSON(t *testing.T, got, want string) {
-    t.Helper()
-    var gotJSON, wantJSON interface{}
-    json.Unmarshal([]byte(got), &gotJSON)
-    json.Unmarshal([]byte(want), &wantJSON)
-    if diff := cmp.Diff(wantJSON, gotJSON); diff != "" {
-        t.Errorf("JSON mismatch (-want +got):\n%s", diff)
-    }
-}
-```
-
-## Architecture Decisions
-
-### Output Management
-- Use `SetOutput(io.Writer)` function to control output destination
-- Default output is `os.Stdout`
-- Tests should capture output using `bytes.Buffer` with `SetOutput`
-
-### External Variables
-- Support both string variables (`--ext-str`) and code variables (`--ext-code`)
-- String variables are passed as-is
-- Code variables are evaluated as Jsonnet expressions
-
-### Native Functions
-- Environment functions: `env(name, default)`, `must_env(name)`, and `env_parse(content)`
-  - `env_parse` parses .env format strings and returns a map[string]any for JSON compatibility
-- Hash functions: `md5(data)`, `sha1(data)`, `sha256(data)`, `sha512(data)` return hash as hexadecimal string
-- File hash functions: `md5_file(filename)`, `sha1_file(filename)`, `sha256_file(filename)`, `sha512_file(filename)` return file content hash as hexadecimal string
-- File functions: `file_content(filename)` returns file content as string, `file_stat(filename)` returns file metadata object
-
-### Native Function Implementation Notes
-- All native functions must return JSON-compatible types (`any`/`interface{}`)
-- When returning maps, use `map[string]any` instead of `map[string]string` for Jsonnet compatibility
-- External dependencies (like `github.com/hashicorp/go-envparse`) should be added via `go get`
-- Always add test coverage:
-  - Unit tests in `functions/<function>_test.go` for detailed testing
-  - At least one integration test case in `integration_test.go` to verify end-to-end functionality
-  - If function reads files, create test fixtures in `testdata/` directory
-
-## Development Workflow
-
-### Go Module Management
-- Always run `go mod tidy` after adding or updating dependencies
-- This ensures go.mod and go.sum are properly synchronized
-- Example workflow:
-  ```bash
-  go get github.com/some/package
-  go mod tidy
-  ```
-
-### Code Formatting
-- Always run `go fmt ./...` before committing code
-- This ensures consistent code formatting across the project
-- Make it a habit to format before every commit
-
-### Git Commit Best Practices
-- Use `git add <file>` to add specific files instead of `git add -A`
-- This prevents accidentally committing unintended changes
-- Review each file before adding:
-  ```bash
-  git status
-  git add functions/new_function.go
-  git add functions/new_function_test.go
-  git add go.mod go.sum
-  git commit -m "Add new function"
-  ```
+jsonnet-armed is a Go CLI tool that extends the standard Jsonnet evaluator with native functions useful for infrastructure/DevOps configuration (env vars, hashing, HTTP, DNS, exec, regex, jq, UUID, x509, etc.). It evaluates Jsonnet files and outputs JSON.
 
 ## Development Commands
 
-### Build
 ```bash
-make
+make                          # Build binary
+make test                     # Run all tests with -race
+go test -v ./...              # Run all tests (verbose)
+go test -v ./functions        # Run only unit tests for native functions
+go test -v -run TestName      # Run a single test by name
+go test -v -run TestName ./functions  # Run a single function test
+make install                  # Install binary
+go fmt ./...                  # Format code (run before every commit)
+go mod tidy                   # Clean dependencies (run after adding deps)
 ```
 
-### Run Tests
-```bash
-go test -v ./...
+## Architecture
+
+### Package Structure
+
+- **`armed` (root package)**: CLI lifecycle, Jsonnet VM orchestration, caching, output handling. Key types: `CLI` (kong-based), `Cache`, `ArmedImporter`.
+- **`functions` package**: All native function implementations. No knowledge of the `armed` package (one-way dependency).
+- **`cmd/jsonnet-armed`**: Binary entry point with signal handling.
+
+### Execution Flow
+
+`cmd/main.go` → `armed.Run()` → kong CLI parsing → `cli.run()` → `cli.processRequest()` → `cli.evaluate()` → creates `jsonnet.VM`, registers all native functions via `functions.GenerateAllFunctions(ctx)`, sets `ArmedImporter` (provides virtual `armed.libsonnet`), evaluates Jsonnet.
+
+### Native Function Registration Pattern
+
+Functions follow two patterns:
+
+**Static maps** (context-independent) — most functions use this:
+```go
+// In functions/<category>.go
+var CategoryFunctions = map[string]*jsonnet.NativeFunction{
+    "func_name": {
+        Params: []ast.Identifier{"param1", "param2"},
+        Func: func(args []any) (any, error) { ... },
+    },
+}
+func init() { initializeFunctionMap(CategoryFunctions) }  // sets Name from map key
 ```
 
-### Install
-```bash
-make install
+**Generator functions** (context-dependent) — used by `exec` and `http`:
+```go
+func GenerateExecFunctions(ctx context.Context) map[string]*jsonnet.NativeFunction { ... }
 ```
 
-## Native Function Development Guidelines
+All function maps are aggregated in `functions/armed.go:GenerateAllFunctions()`. When adding a new category, add its map iteration there.
 
-### Function Planning and Research
-- Before implementing new functions, research existing Jsonnet standard library functions to avoid duplication
-- Use reliable, well-maintained libraries (e.g., `github.com/google/uuid` for UUID generation)
-- Prioritize functions that fill gaps in infrastructure/DevOps configuration use cases
-- Consider security implications: use proven cryptographic libraries rather than custom implementations
+### ArmedImporter
 
-### Function Categories and Naming
-- Follow consistent naming patterns: `<category>_<operation>` (e.g., `uuid_v4`, `regex_match`)
-- Group related functions in single files (e.g., `uuid.go` for all UUID functions)
-- Export function maps with descriptive names (e.g., `UuidFunctions`, `RegexpFunctions`)
+Custom Jsonnet importer that intercepts `import 'armed.libsonnet'` and dynamically generates a Jsonnet object mapping all function names to `std.native()` calls. Users can use either `std.native("func")` or `(import 'armed.libsonnet').func`.
 
-### Function Implementation Patterns
-- All native functions should accept `[]any` parameters and return `(any, error)`
-- Validate input types early and return descriptive errors
-- Return JSON-compatible types: use `[]any` instead of `[]string` for arrays
-- Handle edge cases gracefully (e.g., return empty arrays instead of nil for no matches)
+## Adding New Native Functions
 
-### Function Registration
-- Register function maps in `functions/armed.go` within `GenerateAllFunctions()`
-- Use `initializeFunctionMap()` helper in each function file's `init()` function
-- Ensure functions are available both as native functions and in the armed library
+1. Create `functions/<category>.go` with exported map (e.g., `CategoryFunctions`)
+2. Use `init()` to call `initializeFunctionMap()`
+3. Register in `functions/armed.go:GenerateAllFunctions()`
+4. All functions must return `(any, error)` with JSON-compatible types (`map[string]any`, `[]any`, not typed maps/slices)
+5. Add unit tests in `functions/<category>_test.go` (package `functions_test`, table-driven)
+6. Add integration test case in `integration_test.go` (package `armed_test`)
+7. Create test fixtures in `testdata/` if function reads files
 
-### Integration Test Requirements
-- Add integration test cases in `integration_test.go` following existing patterns
-- For dynamic outputs (UUIDs, timestamps), use validation patterns in `normalizeTimestamps()`
-- Test realistic use cases that demonstrate practical value
+## Testing Conventions
 
-### Documentation and Examples
-- Document new functions in integration tests with realistic usage examples
-- Follow existing comment patterns in function implementations
-- Update README.md with new function categories and examples when adding significant functionality
+- Table-driven tests with `[]struct{ name, args/jsonnet, expected, expectError }`
+- Use `github.com/google/go-cmp/cmp.Diff` for JSON structural comparison
+- Use `cli.SetWriter(&buf)` to capture output in tests — never replace `os.Stdout`
+- For non-deterministic outputs (UUIDs, timestamps): test format validity with regex, use validation placeholders like `<valid_uuid_v4>` in integration tests
+- Unit test helpers in `functions/test_helpers_test.go` provide `getEnvFunction()`, `getHashFunction()`, etc.
 
-### Dependency Management
-- Prefer standard library when possible
-- For external dependencies, choose well-maintained, popular libraries
-- Always run `go mod tidy` after adding dependencies
-- Consider dependency size and security implications
+## Pre-commit Checklist
 
-### Testing Strategy for Dynamic Functions
-- For functions with non-deterministic outputs (UUIDs, random values, timestamps):
-  - Test format/pattern validity using regular expressions
-  - Test functional properties (e.g., UUID v7 time ordering)
-  - Use validation placeholders in integration tests (e.g., `<valid_uuid_v4>`)
-  - Implement custom comparison logic in test helpers when needed
-
-### Security Considerations
-- Never implement custom cryptographic functions
-- Use established libraries for security-sensitive operations
-- Validate inputs to prevent injection attacks in exec-style functions
-- Consider rate limiting for network-based functions
-
-## Code Quality and Review Guidelines
-
-### Pre-commit Checklist
-- [ ] Run `go fmt ./...` to format code
-- [ ] Run `go mod tidy` to clean dependencies
-- [ ] Run unit tests: `go test -v ./functions`
-- [ ] Run integration tests: `go test -v`
-- [ ] Verify new functions work in practice with test Jsonnet files
-
-### Branch and PR Workflow
-- Create feature branches with descriptive names: `feature/function-category`
-- Use clear, concise commit messages explaining the "why" not just the "what"
-- Include comprehensive test coverage in PR descriptions
-- Test functions manually before creating PRs
-
-### Function Validation Criteria
-- Functions should solve real-world infrastructure/configuration problems
-- Avoid duplicating Jsonnet standard library functionality
-- Ensure cross-platform compatibility (especially for file/path operations)
-- Consider performance implications for functions that might be called frequently
-
-## Future Enhancements
-- Native functions support (currently commented out in code)
-- Additional Jsonnet extensions and utility functions
+1. `go fmt ./...`
+2. `go mod tidy`
+3. `go test -v ./functions` (unit tests)
+4. `go test -v` (integration tests)
