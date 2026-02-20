@@ -9,7 +9,7 @@ import (
 )
 
 type CLI struct {
-	Output         string            `short:"o" name:"output" help:"Write to the output file or http(s) URL rather than stdout"`
+	Output         []string          `short:"o" name:"output" help:"Write to the output file(s) or http(s) URL(s) rather than stdout (can be repeated)"`
 	Stdout         bool              `short:"S" name:"stdout" help:"Also write to stdout when using -o/--output" negatable:""`
 	WriteIfChanged bool              `name:"write-if-changed" help:"Write output file only if content has changed"`
 	ExtStr         map[string]string `short:"V" name:"ext-str" help:"Set external string variable (can be repeated)."`

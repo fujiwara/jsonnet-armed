@@ -275,7 +275,7 @@ func TestRunWithCLIOutputToFile(t *testing.T) {
 			// Create CLI config
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
-				Output:   outputFile,
+				Output:   []string{outputFile},
 				ExtStr:   tt.extStr,
 				ExtCode:  tt.extCode,
 			}
@@ -713,7 +713,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			Output:         outputFile,
+			Output:         []string{outputFile},
 			WriteIfChanged: true,
 		}
 
@@ -760,7 +760,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			Output:         outputFile,
+			Output:         []string{outputFile},
 			WriteIfChanged: true,
 		}
 
@@ -809,7 +809,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			Output:         outputFile,
+			Output:         []string{outputFile},
 			WriteIfChanged: true,
 		}
 
@@ -862,7 +862,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			Output:         outputFile,
+			Output:         []string{outputFile},
 			WriteIfChanged: true,
 		}
 
@@ -919,7 +919,7 @@ func TestWriteIfChanged(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename:       jsonnetFile,
-			Output:         outputFile,
+			Output:         []string{outputFile},
 			WriteIfChanged: false, // Explicitly disabled (default)
 		}
 
@@ -966,7 +966,7 @@ func TestAtomicFileWrite(t *testing.T) {
 
 				cli := &armed.CLI{
 					Filename: jsonnetFile,
-					Output:   outputFile,
+					Output:   []string{outputFile},
 				}
 
 				if err := cli.Run(ctx); err != nil {
@@ -1012,7 +1012,7 @@ func TestAtomicFileWrite(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename: jsonnetFile,
-			Output:   outputFile,
+			Output:   []string{outputFile},
 		}
 
 		if err := cli.Run(ctx); err != nil {
@@ -1044,7 +1044,7 @@ func TestAtomicFileWrite(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename: jsonnetFile,
-			Output:   outputFile,
+			Output:   []string{outputFile},
 		}
 
 		if err := cli.Run(ctx); err != nil {
@@ -1077,7 +1077,7 @@ func TestAtomicFileWrite(t *testing.T) {
 
 		cli := &armed.CLI{
 			Filename: jsonnetFile,
-			Output:   outputFile,
+			Output:   []string{outputFile},
 		}
 
 		err := cli.Run(ctx)
@@ -1154,7 +1154,7 @@ func TestRunWithCLIOutputToHTTP(t *testing.T) {
 			// Create CLI config
 			cli := &armed.CLI{
 				Filename: jsonnetFile,
-				Output:   server.URL,
+				Output:   []string{server.URL},
 			}
 
 			// Add external variables if needed
@@ -1217,7 +1217,7 @@ func TestRunWithCLIOutputToHTTPS(t *testing.T) {
 	// Create CLI config
 	cli := &armed.CLI{
 		Filename: jsonnetFile,
-		Output:   server.URL, // This is already an HTTPS URL from NewTLSServer
+		Output:   []string{server.URL}, // This is already an HTTPS URL from NewTLSServer
 	}
 
 	// Note: This test will fail because the test server uses a self-signed certificate.
@@ -1333,4 +1333,134 @@ func TestRunWithCLIDocument(t *testing.T) {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
+}
+
+func TestRunWithCLIMultipleOutputFiles(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+	if err := os.WriteFile(jsonnetFile, []byte(`{hello: "world"}`), 0644); err != nil {
+		t.Fatalf("failed to write jsonnet file: %v", err)
+	}
+
+	out1 := filepath.Join(tmpDir, "out1.json")
+	out2 := filepath.Join(tmpDir, "out2.json")
+
+	cli := &armed.CLI{
+		Filename: jsonnetFile,
+		Output:   []string{out1, out2},
+	}
+
+	if err := cli.Run(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Both files should contain identical content
+	data1, err := os.ReadFile(out1)
+	if err != nil {
+		t.Fatalf("failed to read out1: %v", err)
+	}
+	data2, err := os.ReadFile(out2)
+	if err != nil {
+		t.Fatalf("failed to read out2: %v", err)
+	}
+
+	compareJSON(t, string(data1), `{"hello": "world"}`)
+	compareJSON(t, string(data2), `{"hello": "world"}`)
+}
+
+func TestRunWithCLIMultipleOutputFileAndHTTP(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		receivedBody = body
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+	if err := os.WriteFile(jsonnetFile, []byte(`{mixed: "output"}`), 0644); err != nil {
+		t.Fatalf("failed to write jsonnet file: %v", err)
+	}
+
+	outFile := filepath.Join(tmpDir, "out.json")
+
+	cli := &armed.CLI{
+		Filename: jsonnetFile,
+		Output:   []string{outFile, server.URL},
+	}
+
+	if err := cli.Run(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should have content
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+	compareJSON(t, string(data), `{"mixed": "output"}`)
+
+	// HTTP server should have received the same content
+	compareJSON(t, string(receivedBody), `{"mixed": "output"}`)
+}
+
+func TestRunWithCLIMultipleOutputWithStdout(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+	if err := os.WriteFile(jsonnetFile, []byte(`{stdout: "test"}`), 0644); err != nil {
+		t.Fatalf("failed to write jsonnet file: %v", err)
+	}
+
+	out1 := filepath.Join(tmpDir, "out1.json")
+	out2 := filepath.Join(tmpDir, "out2.json")
+
+	// Capture real stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stdout = w
+
+	cli := &armed.CLI{
+		Filename: jsonnetFile,
+		Output:   []string{out1, out2},
+		Stdout:   true,
+	}
+
+	runErr := cli.Run(ctx)
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+	var stdoutBuf bytes.Buffer
+	io.Copy(&stdoutBuf, r)
+	r.Close()
+
+	if runErr != nil {
+		t.Fatalf("unexpected error: %v", runErr)
+	}
+
+	// Files should have content
+	data1, err := os.ReadFile(out1)
+	if err != nil {
+		t.Fatalf("failed to read out1: %v", err)
+	}
+	data2, err := os.ReadFile(out2)
+	if err != nil {
+		t.Fatalf("failed to read out2: %v", err)
+	}
+
+	compareJSON(t, string(data1), `{"stdout": "test"}`)
+	compareJSON(t, string(data2), `{"stdout": "test"}`)
+
+	// Stdout should have received the output exactly once
+	compareJSON(t, stdoutBuf.String(), `{"stdout": "test"}`)
 }
