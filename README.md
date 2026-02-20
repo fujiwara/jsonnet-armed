@@ -108,9 +108,10 @@ jsonnet-armed [options] <jsonnet-file>
 
 #### Options
 
-- `-o, --output <target>`: Write output to file or HTTP(S) URL instead of stdout
+- `-o, --output <target>`: Write output to file or HTTP(S) URL instead of stdout (can be repeated)
   - File output uses atomic writes to prevent corruption
   - HTTP(S) output sends JSON via POST request with Content-Type: application/json
+  - Multiple `-o` flags can be specified to write the same output to multiple destinations
 - `-S, --stdout`: Also write to stdout when using `-o/--output` (can be negated with `--no-stdout`)
 - `--write-if-changed`: Write output file only if content has changed (compares using file size and SHA256 hash)
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
@@ -144,6 +145,12 @@ jsonnet-armed -o https://api.example.com/config input.jsonnet
 
 # Send to HTTP and also display on stdout
 jsonnet-armed -o https://api.example.com/config -S input.jsonnet
+
+# Write to multiple destinations simultaneously
+jsonnet-armed -o output.json -o https://webhook.example.com/api input.jsonnet
+
+# Multiple files
+jsonnet-armed -o out1.json -o out2.json input.jsonnet
 ```
 
 With external variables:

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -257,17 +258,26 @@ func (cli *CLI) writeOutputToHTTP(ctx context.Context, u string, jsonStr string)
 }
 
 func (cli *CLI) writeOutput(ctx context.Context, jsonStr string) error {
-	out := cli.Output
-	if out == "" {
+	if len(cli.Output) == 0 {
 		_, err := io.WriteString(cli.writer, jsonStr)
 		return err
 	}
 
 	// Also write to stdout if enabled
 	if cli.Stdout {
-		defer io.WriteString(os.Stdout, jsonStr)
+		io.WriteString(os.Stdout, jsonStr)
 	}
 
+	var errs []error
+	for _, out := range cli.Output {
+		if err := cli.writeToDestination(ctx, out, jsonStr); err != nil {
+			errs = append(errs, fmt.Errorf("output %s: %w", out, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (cli *CLI) writeToDestination(ctx context.Context, out string, jsonStr string) error {
 	// Check if output is an HTTP(S) URL
 	u, err := url.Parse(out)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
@@ -276,11 +286,10 @@ func (cli *CLI) writeOutput(ctx context.Context, jsonStr string) error {
 
 	// Write to file
 	data := []byte(jsonStr)
-	// Check if content has changed when WriteIfChanged is enabled
-	if cli.WriteIfChanged && shouldSkipWrite(cli.Output, data) {
+	if cli.WriteIfChanged && shouldSkipWrite(out, data) {
 		return nil
 	}
-	return writeFileAtomic(cli.Output, data, 0644)
+	return writeFileAtomic(out, data, 0644)
 }
 
 // shouldSkipWrite checks if the file write should be skipped because content hasn't changed
