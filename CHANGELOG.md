@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.15](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.14...v0.0.15) - 2026-02-20
+- Allow multiple -o flags for simultaneous output by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/68
+- Update CI Go versions to 1.25 and 1.26 by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/70
+
 ## [v0.0.14](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.13...v0.0.14) - 2026-02-19
 - Rewrite CLAUDE.md for clarity and conciseness by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/65
 - Add --document, --document-toc, --document-search flags by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/67
