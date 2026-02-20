@@ -1231,6 +1231,167 @@ func TestRunWithCLIOutputToHTTPS(t *testing.T) {
 	}
 }
 
+func TestRunWithCLICompactOutput(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name     string
+		jsonnet  string
+		expected string
+	}{
+		{
+			name: "compact object",
+			jsonnet: `{
+				foo: "bar",
+				baz: 123
+			}`,
+			expected: "{\"baz\":123,\"foo\":\"bar\"}\n",
+		},
+		{
+			name:     "compact array",
+			jsonnet:  `[1, 2, 3]`,
+			expected: "[1,2,3]\n",
+		},
+		{
+			name: "compact nested",
+			jsonnet: `{
+				a: { b: { c: "deep" } },
+				d: [1, 2, 3]
+			}`,
+			expected: "{\"a\":{\"b\":{\"c\":\"deep\"}},\"d\":[1,2,3]}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
+				t.Fatalf("failed to write jsonnet file: %v", err)
+			}
+
+			var output bytes.Buffer
+			cli := &armed.CLI{
+				Filename:      jsonnetFile,
+				CompactOutput: true,
+			}
+			cli.SetWriter(&output)
+
+			if err := cli.Run(ctx); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expected, output.String()); diff != "" {
+				t.Errorf("output mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunWithCLIRawOutput(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name     string
+		jsonnet  string
+		expected string
+	}{
+		{
+			name:     "raw string",
+			jsonnet:  `"hello world"`,
+			expected: "hello world\n",
+		},
+		{
+			name:     "raw string with newline",
+			jsonnet:  `"line1\nline2"`,
+			expected: "line1\nline2\n",
+		},
+		{
+			name: "raw non-string (object) outputs normally",
+			jsonnet: `{
+				foo: "bar"
+			}`,
+			// non-string values are output as normal pretty-printed JSON
+			expected: "{\n   \"foo\": \"bar\"\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
+				t.Fatalf("failed to write jsonnet file: %v", err)
+			}
+
+			var output bytes.Buffer
+			cli := &armed.CLI{
+				Filename:  jsonnetFile,
+				RawOutput: true,
+			}
+			cli.SetWriter(&output)
+
+			if err := cli.Run(ctx); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expected, output.String()); diff != "" {
+				t.Errorf("output mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunWithCLICompactAndRawOutput(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name     string
+		jsonnet  string
+		expected string
+	}{
+		{
+			name:     "compact+raw string outputs raw",
+			jsonnet:  `"hello world"`,
+			expected: "hello world\n",
+		},
+		{
+			name: "compact+raw non-string outputs compact",
+			jsonnet: `{
+				foo: "bar",
+				baz: [1, 2]
+			}`,
+			expected: "{\"baz\":[1,2],\"foo\":\"bar\"}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			jsonnetFile := filepath.Join(tmpDir, "test.jsonnet")
+			if err := os.WriteFile(jsonnetFile, []byte(tt.jsonnet), 0644); err != nil {
+				t.Fatalf("failed to write jsonnet file: %v", err)
+			}
+
+			var output bytes.Buffer
+			cli := &armed.CLI{
+				Filename:      jsonnetFile,
+				CompactOutput: true,
+				RawOutput:     true,
+			}
+			cli.SetWriter(&output)
+
+			if err := cli.Run(ctx); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expected, output.String()); diff != "" {
+				t.Errorf("output mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestRunWithCLIDocument(t *testing.T) {
 	ctx := t.Context()
 

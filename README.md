@@ -116,8 +116,10 @@ jsonnet-armed [options] <jsonnet-file>
 - `--write-if-changed`: Write output file only if content has changed (compares using file size and SHA256 hash)
 - `-V, --ext-str <key=value>`: Set external string variable (can be repeated)
 - `--ext-code <key=value>`: Set external code variable (can be repeated)
+- `-c, --compact-output`: Output compact JSON (no indentation), like `jq -c`
+- `-r, --raw-output`: Output raw strings without quotes for string values, like `jq -r`
 - `-t, --timeout <duration>`: Timeout for evaluation (e.g., 30s, 5m, 1h)
-- `-c, --cache <duration>`: Cache evaluation results for specified duration (e.g., 5m, 1h)
+- `--cache <duration>`: Cache evaluation results for specified duration (e.g., 5m, 1h)
 - `--stale <duration>`: Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)
 - `-v, --version`: Show version and exit
 - `--document`: Print full documentation and exit
@@ -151,6 +153,18 @@ jsonnet-armed -o output.json -o https://webhook.example.com/api input.jsonnet
 
 # Multiple files
 jsonnet-armed -o out1.json -o out2.json input.jsonnet
+```
+
+Output formatting:
+```bash
+# Compact output (no indentation)
+jsonnet-armed -c config.jsonnet
+
+# Raw string output (unquoted)
+jsonnet-armed -r '"hello world"'
+
+# Compact + raw (compact for non-strings, raw for strings)
+jsonnet-armed -c -r config.jsonnet
 ```
 
 With external variables:
