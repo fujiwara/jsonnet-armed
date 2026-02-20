@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -156,8 +157,12 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 			if cachedResult, isStale, exists := cache.GetWithStale(cacheKey); exists {
 				if !isStale {
 					// Use fresh cached result
-					err = cli.writeOutput(ctx, cachedResult)
-					return result{jsonStr: cachedResult, err: err}
+					formatted, fErr := cli.formatOutput(cachedResult)
+					if fErr != nil {
+						return result{jsonStr: "", err: fErr}
+					}
+					err = cli.writeOutput(ctx, formatted)
+					return result{jsonStr: formatted, err: err}
 				}
 				// Store stale content for potential fallback
 				staleContent = cachedResult
@@ -174,13 +179,17 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 			slog.Warn("Evaluation failed, using stale cache",
 				"error", err.Error(),
 				"filename", cli.Filename)
-			err = cli.writeOutput(ctx, staleContent)
-			return result{jsonStr: staleContent, err: err}
+			formatted, fErr := cli.formatOutput(staleContent)
+			if fErr != nil {
+				return result{jsonStr: "", err: fErr}
+			}
+			err = cli.writeOutput(ctx, formatted)
+			return result{jsonStr: formatted, err: err}
 		}
 		return result{jsonStr: "", err: err}
 	}
 
-	// Cache the result if cache is enabled
+	// Cache the result if cache is enabled (cache original output before formatting)
 	if cache != nil && cli.cacheKey != "" {
 		// Store in cache (best effort, log errors)
 		if err := cache.Set(cli.cacheKey, jsonStr); err != nil {
@@ -191,9 +200,15 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 		}
 	}
 
+	// Format output (compact/raw)
+	formatted, err := cli.formatOutput(jsonStr)
+	if err != nil {
+		return result{jsonStr: "", err: err}
+	}
+
 	// Write output within the timeout scope
-	err = cli.writeOutput(ctx, jsonStr)
-	return result{jsonStr: jsonStr, err: err}
+	err = cli.writeOutput(ctx, formatted)
+	return result{jsonStr: formatted, err: err}
 }
 
 func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (string, error) {
@@ -227,6 +242,35 @@ func (cli *CLI) evaluate(ctx context.Context, content string, isStdin bool) (str
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate: %w", err)
+	}
+
+	return jsonStr, nil
+}
+
+// formatOutput applies compact and raw output formatting to JSON string.
+func (cli *CLI) formatOutput(jsonStr string) (string, error) {
+	if !cli.CompactOutput && !cli.RawOutput {
+		return jsonStr, nil
+	}
+
+	trimmed := strings.TrimRight(jsonStr, "\n")
+
+	if cli.RawOutput {
+		// Try to parse as a JSON string value
+		var s string
+		if err := json.Unmarshal([]byte(trimmed), &s); err == nil {
+			// It's a string, output unquoted
+			return s + "\n", nil
+		}
+		// Not a string, fall through to compact/normal handling
+	}
+
+	if cli.CompactOutput {
+		var buf bytes.Buffer
+		if err := json.Compact(&buf, []byte(trimmed)); err != nil {
+			return "", fmt.Errorf("failed to compact JSON: %w", err)
+		}
+		return buf.String() + "\n", nil
 	}
 
 	return jsonStr, nil

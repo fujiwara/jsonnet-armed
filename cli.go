@@ -14,8 +14,10 @@ type CLI struct {
 	WriteIfChanged bool              `name:"write-if-changed" help:"Write output file only if content has changed"`
 	ExtStr         map[string]string `short:"V" name:"ext-str" help:"Set external string variable (can be repeated)."`
 	ExtCode        map[string]string `name:"ext-code" help:"Set external code variable (can be repeated)."`
+	CompactOutput  bool              `short:"c" name:"compact-output" help:"Output compact JSON (no indentation)."`
+	RawOutput      bool              `short:"r" name:"raw-output" help:"Output raw strings (unquoted) for string values."`
 	Timeout        time.Duration     `short:"t" name:"timeout" help:"Timeout for evaluation (e.g., 30s, 5m, 1h)"`
-	Cache          time.Duration     `short:"c" name:"cache" help:"Cache evaluation results for specified duration (e.g., 5m, 1h)"`
+	Cache          time.Duration     `name:"cache" help:"Cache evaluation results for specified duration (e.g., 5m, 1h)"`
 	Stale          time.Duration     `name:"stale" help:"Maximum duration to use stale cache when evaluation fails (e.g., 10m, 2h)"`
 	Version        kong.VersionFlag  `short:"v" help:"Show version and exit."`
 	Document       bool              `name:"document" help:"Print full documentation and exit."`
