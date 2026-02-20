@@ -1,3 +1,3 @@
 package armed
 
-var Version = "v0.0.15"
+var Version = "v0.1.0"

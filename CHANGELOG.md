@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.0](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.15...v0.1.0) - 2026-02-20
+- Add --compact-output (-c) and --raw-output (-r) flags by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/71
+
 ## [v0.0.15](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.14...v0.0.15) - 2026-02-20
 - Allow multiple -o flags for simultaneous output by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/68
 - Update CI Go versions to 1.25 and 1.26 by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/70
