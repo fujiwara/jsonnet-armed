@@ -86,6 +86,14 @@ jsonnet-armed provides standard Jsonnet evaluation with external variables suppo
 | `file_stat(filename)` | Get file metadata as object | [📖](#file-functions) |
 | `file_exists(filename)` | Check if file exists | [📖](#file-functions) |
 
+#### Filepath
+| Function | Description | Example |
+|----------|-------------|---------|
+| `basename(path)` | Get base name of a path | [📖](#filepath-functions) |
+| `dirname(path)` | Get directory part of a path | [📖](#filepath-functions) |
+| `extname(path)` | Get file extension (with dot) | [📖](#filepath-functions) |
+| `path_join(elements)` | Join path elements into a single path | [📖](#filepath-functions) |
+
 #### X.509 Certificate
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -1286,6 +1294,42 @@ local file_exists = std.native("file_exists");
     stat: if file_exists(filename) then file_stat(filename) else null,
     safe_size: if file_exists(filename) then file_stat(filename).size else 0
   }
+}
+```
+
+### Filepath Functions
+
+Manipulate file path strings without accessing the filesystem.
+
+Available filepath functions:
+- `basename(path)`: Return the base name (last element) of a path
+- `dirname(path)`: Return the directory part of a path
+- `extname(path)`: Return the file extension including the dot (e.g., `.txt`)
+- `path_join(elements)`: Join an array of path elements into a single path
+
+```jsonnet
+local basename = std.native("basename");
+local dirname = std.native("dirname");
+local extname = std.native("extname");
+local path_join = std.native("path_join");
+
+{
+  // Extract base name from path
+  base: basename("/usr/local/bin/program"),       // "program"
+  base_file: basename("dir/file.txt"),            // "file.txt"
+
+  // Extract directory part
+  dir: dirname("/usr/local/bin/program"),          // "/usr/local/bin"
+  dir_file: dirname("file.txt"),                   // "."
+
+  // Extract file extension
+  ext: extname("config.json"),                     // ".json"
+  ext_none: extname("Makefile"),                   // ""
+  ext_double: extname("archive.tar.gz"),           // ".gz"
+
+  // Join path elements
+  joined: path_join(["/usr", "local", "bin"]),     // "/usr/local/bin"
+  config: path_join(["etc", "app", "config.json"]),// "etc/app/config.json"
 }
 ```
 

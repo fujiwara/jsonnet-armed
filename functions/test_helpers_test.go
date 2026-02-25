@@ -71,3 +71,11 @@ func getJQFunction(name string) (func([]any) (any, error), error) {
 	}
 	return f.Func, nil
 }
+
+func getPathFunction(name string) (func([]any) (any, error), error) {
+	f, ok := functions.PathFunctions[name]
+	if !ok {
+		return nil, fmt.Errorf("path function %s not found", name)
+	}
+	return f.Func, nil
+}
