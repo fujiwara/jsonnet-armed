@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.1](https://github.com/fujiwara/jsonnet-armed/compare/v0.1.0...v0.1.1) - 2026-02-25
+- Add filepath manipulation functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/73
+
 ## [v0.1.0](https://github.com/fujiwara/jsonnet-armed/compare/v0.0.15...v0.1.0) - 2026-02-20
 - Add --compact-output (-c) and --raw-output (-r) flags by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/71
 
