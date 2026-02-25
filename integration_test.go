@@ -525,6 +525,43 @@ func TestIntegrationExamples(t *testing.T) {
 			},
 		},
 		{
+			name: "Filepath functions example",
+			jsonnet: `
+			local basename = std.native("basename");
+			local dirname = std.native("dirname");
+			local extname = std.native("extname");
+			local path_join = std.native("path_join");
+			{
+				// basename
+				base_simple: basename("/usr/local/bin/program"),
+				base_file: basename("dir/file.txt"),
+
+				// dirname
+				dir_abs: dirname("/usr/local/bin/program"),
+				dir_file: dirname("file.txt"),
+
+				// extname
+				ext_txt: extname("file.txt"),
+				ext_none: extname("Makefile"),
+				ext_tar_gz: extname("archive.tar.gz"),
+
+				// path_join
+				joined: path_join(["/usr", "local", "bin"]),
+				joined_file: path_join(["home", "user", "file.txt"]),
+			}`,
+			expected: map[string]any{
+				"base_simple": "program",
+				"base_file":   "file.txt",
+				"dir_abs":     "/usr/local/bin",
+				"dir_file":    ".",
+				"ext_txt":     ".txt",
+				"ext_none":    "",
+				"ext_tar_gz":  ".gz",
+				"joined":      "/usr/local/bin",
+				"joined_file": "home/user/file.txt",
+			},
+		},
+		{
 			name: "X509 certificate and private key functions example",
 			jsonnet: `
 			local x509_certificate = std.native("x509_certificate");
