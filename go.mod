@@ -1,6 +1,6 @@
 module github.com/fujiwara/jsonnet-armed
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/alecthomas/kong v1.13.0
@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/itchyny/gojq v0.12.18
 	github.com/miekg/dns v1.1.72
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
