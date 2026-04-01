@@ -1,11 +1,11 @@
 module github.com/fujiwara/jsonnet-armed
 
-go 1.24.0
+go 1.24.5
 
 require (
 	github.com/alecthomas/kong v1.13.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-jsonnet v0.21.0
+	github.com/google/go-jsonnet v0.22.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/itchyny/gojq v0.12.18
