@@ -38,9 +38,12 @@ func (cli *CLI) AddFunctions(funcs ...*jsonnet.NativeFunction) {
 }
 
 func Run(ctx context.Context) error {
-	cli := &CLI{writer: os.Stdout}
-	kong.Parse(cli, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
-	return cli.run(ctx)
+	root := &rootCLI{Eval: CLI{writer: os.Stdout}}
+	kctx := kong.Parse(root, kong.Vars{"version": fmt.Sprintf("jsonnet-armed %s", Version)})
+	if strings.HasPrefix(kctx.Command(), "serve") {
+		return root.Serve.Run(ctx)
+	}
+	return root.Eval.run(ctx)
 }
 
 // Run runs the jsonnet evaluation with the CLI configuration

@@ -8,6 +8,13 @@ import (
 	"github.com/google/go-jsonnet"
 )
 
+// rootCLI is the top-level kong structure. Eval is the default command so
+// that `jsonnet-armed <filename>` keeps working without a subcommand.
+type rootCLI struct {
+	Eval  CLI      `cmd:"" default:"withargs" help:"Evaluate a jsonnet file (default command)"`
+	Serve ServeCmd `cmd:"" help:"Serve evaluated jsonnet files over HTTP"`
+}
+
 type CLI struct {
 	Output         []string          `short:"o" name:"output" help:"Write to the output file(s) or http(s) URL(s) rather than stdout (can be repeated)"`
 	Stdout         bool              `short:"S" name:"stdout" help:"Also write to stdout when using -o/--output" negatable:""`

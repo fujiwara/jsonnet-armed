@@ -295,6 +295,67 @@ local exec_with_env = std.native("exec_with_env");
 }
 ```
 
+### Server Mode
+
+jsonnet-armed can run as an HTTP server that evaluates jsonnet files on demand. This is useful for building a small API server: the daemon holds credentials (environment variables, cloud credentials, etc.) and evaluates jsonnet files that call native functions (`exec`, `http_get`, DNS lookups, ...), while clients simply GET the results without needing any credentials.
+
+```console
+$ jsonnet-armed serve [--listen localhost:9898] [--timeout 30s] [-V key=value] <dir>
+```
+
+The request path maps directly to a `.jsonnet` file under `<dir>`:
+
+```console
+$ jsonnet-armed serve ./api &
+$ curl 'localhost:9898/hello.jsonnet?name=world'
+{
+   "message": "hello, world"
+}
+```
+
+`GET /foo/bar.jsonnet` evaluates `<dir>/foo/bar.jsonnet` and returns the result as JSON (`Content-Type: application/json`). Only GET requests are accepted, and only paths ending in `.jsonnet` are served. Paths that escape `<dir>` are rejected.
+
+#### Query Parameters
+
+Query parameters are passed to the evaluation as external string variables (ext-str). `-V/--ext-str` given at server startup acts as server-wide defaults; query parameters override them per request.
+
+All values arrive as strings; convert them on the jsonnet side when you need other types (e.g. `std.parseInt`, `std.parseJson`, or comparison for booleans):
+
+```jsonnet
+// limit.jsonnet
+local limit = std.parseInt(std.extVar('limit'));
+{
+  limit: limit,
+  doubled: limit * 2,
+}
+```
+
+```console
+$ curl 'localhost:9898/limit.jsonnet?limit=10'
+{
+   "doubled": 20,
+   "limit": 10
+}
+```
+
+#### Status Codes
+
+| Status | Condition |
+|--------|-----------|
+| 200 | Evaluation succeeded |
+| 404 | File not found, non-`.jsonnet` path, or path traversal attempt |
+| 405 | Method other than GET |
+| 500 | Evaluation error (body: `{"error": "..."}` including the jsonnet error message) |
+| 504 | Evaluation timed out (`--timeout`) |
+
+#### Security Notes
+
+- The server binds to `localhost` by default. **Server mode assumes trusted clients.** The served jsonnet files can execute commands and access credentials on the server, and clients control their inputs via query parameters — never expose the server beyond localhost or a trusted network without an authenticating proxy.
+- Query parameters are passed only as external *string* variables; clients cannot inject jsonnet code.
+- Error responses include jsonnet error details (file paths, expressions) to aid debugging.
+
+The server shuts down gracefully on SIGINT/SIGTERM, allowing in-flight evaluations to complete (up to 5 seconds).
+
 ### Library Usage
 
 jsonnet-armed can be embedded in your Go application as a configuration loader.
