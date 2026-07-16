@@ -1,0 +1,3 @@
+{
+  secret: 'top-secret-value',
+}
