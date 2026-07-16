@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +188,40 @@ func TestServerHandler(t *testing.T) {
 				t.Errorf("body %q must not contain %q", body, tt.wantNotContains)
 			}
 		})
+	}
+}
+
+func TestServerSymlink(t *testing.T) {
+	// A symlink pointing outside the served directory must be rejected,
+	// while a symlink staying inside it is served normally.
+	escape := filepath.Join("testdata", "server", "escape.jsonnet")
+	if err := os.Symlink(filepath.Join("..", "secret.jsonnet"), escape); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+	defer os.Remove(escape)
+	inside := filepath.Join("testdata", "server", "alias.jsonnet")
+	if err := os.Symlink("static.jsonnet", inside); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+	defer os.Remove(inside)
+
+	s := &armed.ServeCmd{Dir: "testdata/server"}
+
+	req := httptest.NewRequest(http.MethodGet, "/escape.jsonnet", nil)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("escape symlink: status got %d, want %d", rec.Code, http.StatusNotFound)
+	}
+	if strings.Contains(rec.Body.String(), "top-secret-value") {
+		t.Errorf("escape symlink: body %q must not contain secret content", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/alias.jsonnet", nil)
+	rec = httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("inside symlink: status got %d, want %d (body: %s)", rec.Code, http.StatusOK, rec.Body.String())
 	}
 }
 

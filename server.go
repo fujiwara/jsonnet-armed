@@ -138,8 +138,8 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 }
 
 // resolvePath maps a URL path to a .jsonnet file under s.Dir.
-// It returns false for paths that are not .jsonnet files, escape s.Dir,
-// or do not exist.
+// It returns false for paths that are not .jsonnet files, escape s.Dir
+// (including via symlinks), or do not exist.
 func (s *ServeCmd) resolvePath(urlPath string) (string, bool) {
 	// A leading slash + path.Clean prevents ".." from escaping the root
 	// (e.g. path.Clean("/../x") == "/x"). urlPath is already percent-decoded.
@@ -147,19 +147,18 @@ func (s *ServeCmd) resolvePath(urlPath string) (string, bool) {
 	if !strings.HasSuffix(upath, ".jsonnet") {
 		return "", false
 	}
-	absDir, err := filepath.Abs(s.Dir)
+	rel := strings.TrimPrefix(upath, "/")
+	// os.Root rejects paths that escape s.Dir, including via symlinks.
+	root, err := os.OpenRoot(s.Dir)
 	if err != nil {
 		return "", false
 	}
-	filename := filepath.Join(absDir, filepath.FromSlash(upath))
-	if filename != absDir && !strings.HasPrefix(filename, absDir+string(filepath.Separator)) {
-		return "", false
-	}
-	st, err := os.Stat(filename)
+	defer root.Close()
+	st, err := root.Stat(rel)
 	if err != nil || st.IsDir() {
 		return "", false
 	}
-	return filename, true
+	return filepath.Join(s.Dir, filepath.FromSlash(rel)), true
 }
 
 // mergeQueryVars merges query parameters into the server-wide default
