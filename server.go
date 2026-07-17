@@ -98,7 +98,9 @@ func (s *ServeCmd) cleanCachePeriodically(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.cache.Clean()
+			if err := s.cache.Clean(); err != nil {
+				slog.Warn("Failed to clean cache", "error", err.Error())
+			}
 		}
 	}
 }
@@ -180,14 +182,16 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 			slog.Error("failed to evaluate", "file", filename, "error", res.err)
 			return writeJSONError(w, http.StatusInternalServerError, res.err.Error())
 		}
+		// Report MISS (and cacheability) only when the result was
+		// actually stored; if key generation failed, the response is not
+		// backed by the cache.
+		var cacheStatus string
 		if cacheKey != "" {
 			if err := s.cache.Set(cacheKey, res.jsonStr); err != nil {
 				slog.Warn("Failed to save cache", "error", err.Error(), "file", filename)
+			} else {
+				cacheStatus = "MISS"
 			}
-		}
-		var cacheStatus string
-		if s.cache != nil {
-			cacheStatus = "MISS"
 		}
 		return s.writeJSONResponse(w, res.jsonStr, cacheStatus)
 	case <-ectx.Done():
