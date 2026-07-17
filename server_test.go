@@ -1,10 +1,12 @@
 package armed_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -564,9 +566,7 @@ func TestServerCacheConcurrent(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			resp, err := http.Get(fmt.Sprintf("%s/uuid.jsonnet?i=%d", ts.URL, i%5))
 			if err != nil {
 				t.Error(err)
@@ -577,12 +577,92 @@ func TestServerCacheConcurrent(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("status: got %d, want 200", resp.StatusCode)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }
 
+// syncBuffer is a goroutine-safe buffer for capturing log output.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// captureLogs redirects slog's default logger to a buffer for the test.
+func captureLogs(t *testing.T) *syncBuffer {
+	t.Helper()
+	buf := &syncBuffer{}
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+	return buf
+}
+
+// waitForLog waits until the buffer contains the substring (request logs
+// are written after the response, so they may lag behind the client).
+func waitForLog(t *testing.T, buf *syncBuffer, substr string) {
+	t.Helper()
+	for range 20 {
+		if strings.Contains(buf.String(), substr) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("log does not contain %q: %s", substr, buf.String())
+}
+
+func TestServerRequestLogCacheStatus(t *testing.T) {
+	buf := captureLogs(t)
+	s := &armed.ServeCmd{Dir: "testdata/server", Cache: time.Minute}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	for range 2 {
+		resp, err := http.Get(ts.URL + "/static.jsonnet")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+
+	waitForLog(t, buf, "cache=HIT")
+	if logs := buf.String(); !strings.Contains(logs, "cache=MISS") {
+		t.Errorf("log does not contain cache=MISS: %s", logs)
+	}
+}
+
+func TestServerRequestLogWithoutCache(t *testing.T) {
+	buf := captureLogs(t)
+	s := &armed.ServeCmd{Dir: "testdata/server"}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/static.jsonnet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	waitForLog(t, buf, "msg=request")
+	if logs := buf.String(); strings.Contains(logs, "cache=") {
+		t.Errorf("log must not contain a cache attribute when cache is disabled: %s", logs)
+	}
+}
+
 func TestServerGracefulShutdown(t *testing.T) {
+	buf := captureLogs(t)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -619,5 +699,12 @@ func TestServerGracefulShutdown(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("Serve did not return within 2s after context cancel")
+	}
+
+	logs := buf.String()
+	for _, want := range []string{"shutting down server", "server stopped"} {
+		if !strings.Contains(logs, want) {
+			t.Errorf("log does not contain %q: %s", want, logs)
+		}
 	}
 }

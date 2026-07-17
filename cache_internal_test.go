@@ -265,16 +265,14 @@ func TestMemoryCacheConcurrent(t *testing.T) {
 	c := newMemoryCache(time.Minute, 5*time.Minute)
 	var wg sync.WaitGroup
 	for i := range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			key := fmt.Sprintf("key%d", i%3)
 			for range 100 {
 				c.Set(key, "result")
 				c.getWithStale(key)
 				c.Clean()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

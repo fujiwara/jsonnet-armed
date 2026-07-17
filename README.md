@@ -300,7 +300,7 @@ local exec_with_env = std.native("exec_with_env");
 jsonnet-armed can run as an HTTP server that evaluates jsonnet files on demand. This is useful for building a small API server: the daemon holds credentials (environment variables, cloud credentials, etc.) and evaluates jsonnet files that call native functions (`exec`, `http_get`, DNS lookups, ...), while clients simply GET the results without needing any credentials.
 
 ```console
-$ jsonnet-armed serve [--listen localhost:9898] [--timeout 30s] [-V key=value] [--cache 5m] [--stale 10m] <dir>
+$ jsonnet-armed serve [--listen localhost:9898] [--timeout 30s] [-V key=value] [--cache 5m] [--stale 10m] [--log-format text|json] <dir>
 ```
 
 The request path maps directly to a `.jsonnet` file under `<dir>`:
@@ -368,6 +368,20 @@ $ jsonnet-armed serve --cache 5m --stale 10m ./api
 | 405 | Method other than GET |
 | 500 | Evaluation error (body: `{"error": "..."}` including the jsonnet error message) |
 | 504 | Evaluation timed out (`--timeout`) |
+
+#### Logging
+
+Logs are written to stderr. Each request is logged with its method, path, status, duration, remote address, and (when caching is enabled) the cache result:
+
+```
+INFO request method=GET path=/hello.jsonnet status=200 duration=1.2ms remote=127.0.0.1:50000 cache=HIT
+```
+
+`--log-format json` switches to structured JSON logs (default: `text`):
+
+```json
+{"time":"2026-07-17T13:00:00+09:00","level":"INFO","msg":"request","method":"GET","path":"/hello.jsonnet","status":200,"duration":1200000,"remote":"127.0.0.1:50000","cache":"HIT"}
+```
 
 #### Security Notes
 
