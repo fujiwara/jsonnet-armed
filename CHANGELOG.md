@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.2.0](https://github.com/fujiwara/jsonnet-armed/compare/v0.1.1...v0.2.0) - 2026-07-17
+- Add HTTP server mode (serve subcommand) by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/88
+- Add in-memory --cache/--stale to serve mode by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/90
+- Bump dependencies (dependabot roll-up) by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/91
+
 ## [v0.1.1](https://github.com/fujiwara/jsonnet-armed/compare/v0.1.0...v0.1.1) - 2026-02-25
 - Add filepath manipulation functions by @fujiwara in https://github.com/fujiwara/jsonnet-armed/pull/73
 
