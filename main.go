@@ -81,7 +81,7 @@ func (cli *CLI) run(ctx context.Context) error {
 	}
 
 	// Initialize cache if enabled
-	var cache *Cache
+	var cache cacheStore
 	if cli.Cache > 0 {
 		cache = NewCache(cli.Cache, cli.Stale)
 		// Clean expired cache entries (best effort)
@@ -122,7 +122,7 @@ type result struct {
 	err     error
 }
 
-func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
+func (cli *CLI) processRequest(ctx context.Context, cache cacheStore) result {
 	// Read input content and determine if it's from stdin
 	var inputContent string
 	var isStdin bool
@@ -151,7 +151,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 	// Try to get from cache if enabled
 	var staleContent string
 	if cache != nil {
-		cacheKey, err := cache.GenerateCacheKey(cli, contentBytes)
+		cacheKey, err := generateCacheKey(cli, contentBytes)
 		if err != nil {
 			slog.Warn("Failed to generate cache key",
 				"error", err.Error(),

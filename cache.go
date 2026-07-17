@@ -13,6 +13,22 @@ import (
 	"time"
 )
 
+// cacheStore is the common interface of evaluation result caches.
+// GetWithStale returns (content, isStale, exists): a fresh entry (within
+// ttl) is returned with isStale=false, an entry within staleTTL with
+// isStale=true, and a completely expired entry is removed and reported
+// as not existing.
+type cacheStore interface {
+	GetWithStale(key string) (content string, isStale bool, exists bool)
+	Set(key string, result string) error
+	Clean() error
+}
+
+var (
+	_ cacheStore = (*Cache)(nil)
+	_ cacheStore = (*memoryCache)(nil)
+)
+
 type Cache struct {
 	dir      string
 	ttl      time.Duration
@@ -207,17 +223,18 @@ func (c *memoryCache) GetWithStale(key string) (string, bool, bool) {
 }
 
 // Set stores a result in the cache
-func (c *memoryCache) Set(key string, result string) {
+func (c *memoryCache) Set(key string, result string) error {
 	if c.ttl == 0 {
-		return
+		return nil
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries[key] = memoryCacheEntry{content: result, storedAt: time.Now()}
+	return nil
 }
 
 // Clean removes completely expired entries
-func (c *memoryCache) Clean() {
+func (c *memoryCache) Clean() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	maxAge := c.maxAge()
@@ -226,6 +243,7 @@ func (c *memoryCache) Clean() {
 			delete(c.entries, key)
 		}
 	}
+	return nil
 }
 
 // maxAge returns the maximum duration an entry may be kept

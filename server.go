@@ -35,7 +35,7 @@ type ServeCmd struct {
 	functions []*jsonnet.NativeFunction `kong:"-"`
 
 	// cache holds the in-memory cache for evaluation results
-	cache *memoryCache `kong:"-"`
+	cache cacheStore `kong:"-"`
 }
 
 // AddFunctions adds custom native functions to the server
@@ -89,7 +89,8 @@ func (s *ServeCmd) Handler() http.Handler {
 // cleanCachePeriodically removes completely expired cache entries until
 // ctx is cancelled.
 func (s *ServeCmd) cleanCachePeriodically(ctx context.Context) {
-	ticker := time.NewTicker(s.cache.maxAge())
+	interval := max(s.Cache, s.Stale)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -173,7 +174,9 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 			return writeJSONError(w, http.StatusInternalServerError, res.err.Error())
 		}
 		if cacheKey != "" {
-			s.cache.Set(cacheKey, res.jsonStr)
+			if err := s.cache.Set(cacheKey, res.jsonStr); err != nil {
+				slog.Warn("Failed to save cache", "error", err.Error(), "file", filename)
+			}
 		}
 		var cacheStatus string
 		if s.cache != nil {
