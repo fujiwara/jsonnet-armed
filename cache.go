@@ -9,7 +9,30 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
+)
+
+// cacheEntry is the result of a cache lookup.
+type cacheEntry struct {
+	content string
+	age     time.Duration // time elapsed since the entry was stored
+	isStale bool          // beyond ttl but within staleTTL
+}
+
+// cacheStore is the common interface of evaluation result caches.
+// getWithStale returns a fresh entry (within ttl) with isStale=false, an
+// entry within staleTTL with isStale=true, and removes a completely
+// expired entry, reporting it as not existing.
+type cacheStore interface {
+	getWithStale(key string) (entry cacheEntry, exists bool)
+	Set(key string, result string) error
+	Clean() error
+}
+
+var (
+	_ cacheStore = (*Cache)(nil)
+	_ cacheStore = (*memoryCache)(nil)
 )
 
 type Cache struct {
@@ -39,6 +62,11 @@ func getCacheDir() string {
 
 // GenerateCacheKey creates a unique cache key based on input parameters and content
 func (c *Cache) GenerateCacheKey(cli *CLI, content []byte) (string, error) {
+	return generateCacheKey(cli, content)
+}
+
+// generateCacheKey creates a unique cache key based on input parameters and content
+func generateCacheKey(cli *CLI, content []byte) (string, error) {
 	hasher := sha256.New()
 
 	// Marshal the CLI configuration to JSON for consistent hashing
@@ -79,8 +107,13 @@ func (c *Cache) Get(key string) (string, bool) {
 // GetWithStale retrieves a cached result with stale status information
 // Returns (content, isStale, exists)
 func (c *Cache) GetWithStale(key string) (string, bool, bool) {
+	entry, exists := c.getWithStale(key)
+	return entry.content, entry.isStale, exists
+}
+
+func (c *Cache) getWithStale(key string) (cacheEntry, bool) {
 	if c.ttl == 0 {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	cachePath := filepath.Join(c.dir, key+".json")
@@ -88,7 +121,7 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 	// Check file stats first
 	stat, err := os.Stat(cachePath)
 	if err != nil {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	age := time.Since(stat.ModTime())
@@ -101,9 +134,9 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 				"error", err.Error(),
 				"cache_path", cachePath,
 				"cache_key", key[:8]+"...")
-			return "", false, false
+			return cacheEntry{}, false
 		}
-		return string(data), false, true
+		return cacheEntry{content: string(data), age: age}, true
 	}
 
 	// Check stale cache (within staleTTL)
@@ -114,9 +147,9 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 				"error", err.Error(),
 				"cache_path", cachePath,
 				"cache_key", key[:8]+"...")
-			return "", false, false
+			return cacheEntry{}, false
 		}
-		return string(data), true, true
+		return cacheEntry{content: string(data), age: age, isStale: true}, true
 	}
 
 	// Completely expired - remove it
@@ -126,7 +159,7 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 			"cache_path", cachePath,
 			"cache_key", key[:8]+"...")
 	}
-	return "", false, false
+	return cacheEntry{}, false
 }
 
 // Set stores a result in the cache
@@ -147,6 +180,88 @@ func (c *Cache) Set(key string, result string) error {
 	// Use 0600 permissions to protect potentially sensitive information
 	cachePath := filepath.Join(c.dir, key+".json")
 	return writeFileAtomic(cachePath, []byte(result), 0600)
+}
+
+type memoryCacheEntry struct {
+	content  string
+	storedAt time.Time
+}
+
+// memoryCache is an in-memory cache with the same fresh/stale/expired
+// semantics as the file-based Cache. It is safe for concurrent use.
+type memoryCache struct {
+	mu       sync.Mutex
+	ttl      time.Duration
+	staleTTL time.Duration
+	entries  map[string]memoryCacheEntry
+}
+
+func newMemoryCache(ttl, staleTTL time.Duration) *memoryCache {
+	return &memoryCache{
+		ttl:      ttl,
+		staleTTL: staleTTL,
+		entries:  make(map[string]memoryCacheEntry),
+	}
+}
+
+// getWithStale retrieves a cached result with stale status information.
+// Completely expired entries are removed on access.
+func (c *memoryCache) getWithStale(key string) (cacheEntry, bool) {
+	if c.ttl == 0 {
+		return cacheEntry{}, false
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.entries[key]
+	if !ok {
+		return cacheEntry{}, false
+	}
+
+	age := time.Since(entry.storedAt)
+	if age <= c.ttl {
+		return cacheEntry{content: entry.content, age: age}, true
+	}
+	if c.staleTTL > 0 && age <= c.staleTTL {
+		return cacheEntry{content: entry.content, age: age, isStale: true}, true
+	}
+
+	// Completely expired - remove it
+	delete(c.entries, key)
+	return cacheEntry{}, false
+}
+
+// Set stores a result in the cache
+func (c *memoryCache) Set(key string, result string) error {
+	if c.ttl == 0 {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = memoryCacheEntry{content: result, storedAt: time.Now()}
+	return nil
+}
+
+// Clean removes completely expired entries
+func (c *memoryCache) Clean() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	maxAge := c.maxAge()
+	for key, entry := range c.entries {
+		if time.Since(entry.storedAt) > maxAge {
+			delete(c.entries, key)
+		}
+	}
+	return nil
+}
+
+// maxAge returns the maximum duration an entry may be kept
+func (c *memoryCache) maxAge() time.Duration {
+	if c.staleTTL > c.ttl {
+		return c.staleTTL
+	}
+	return c.ttl
 }
 
 // Clean removes expired cache entries

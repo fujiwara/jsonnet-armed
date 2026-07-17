@@ -81,7 +81,7 @@ func (cli *CLI) run(ctx context.Context) error {
 	}
 
 	// Initialize cache if enabled
-	var cache *Cache
+	var cache cacheStore
 	if cli.Cache > 0 {
 		cache = NewCache(cli.Cache, cli.Stale)
 		// Clean expired cache entries (best effort)
@@ -122,7 +122,7 @@ type result struct {
 	err     error
 }
 
-func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
+func (cli *CLI) processRequest(ctx context.Context, cache cacheStore) result {
 	// Read input content and determine if it's from stdin
 	var inputContent string
 	var isStdin bool
@@ -151,16 +151,16 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 	// Try to get from cache if enabled
 	var staleContent string
 	if cache != nil {
-		cacheKey, err := cache.GenerateCacheKey(cli, contentBytes)
+		cacheKey, err := generateCacheKey(cli, contentBytes)
 		if err != nil {
 			slog.Warn("Failed to generate cache key",
 				"error", err.Error(),
 				"filename", cli.Filename)
 		} else {
-			if cachedResult, isStale, exists := cache.GetWithStale(cacheKey); exists {
-				if !isStale {
+			if entry, exists := cache.getWithStale(cacheKey); exists {
+				if !entry.isStale {
 					// Use fresh cached result
-					formatted, fErr := cli.formatOutput(cachedResult)
+					formatted, fErr := cli.formatOutput(entry.content)
 					if fErr != nil {
 						return result{jsonStr: "", err: fErr}
 					}
@@ -168,7 +168,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache *Cache) result {
 					return result{jsonStr: formatted, err: err}
 				}
 				// Store stale content for potential fallback
-				staleContent = cachedResult
+				staleContent = entry.content
 			}
 			// Store cache key for later use
 			cli.cacheKey = cacheKey

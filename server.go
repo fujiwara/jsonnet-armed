@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,10 +28,15 @@ type ServeCmd struct {
 	Listen  string            `name:"listen" default:"localhost:9898" help:"Listen address (host:port)"`
 	Timeout time.Duration     `short:"t" name:"timeout" help:"Timeout for each request's evaluation (e.g., 30s, 5m)"`
 	ExtStr  map[string]string `short:"V" name:"ext-str" help:"Default external string variables (overridden by query parameters)"`
+	Cache   time.Duration     `name:"cache" help:"Cache evaluation results in memory for specified duration (e.g., 5m, 1h)"`
+	Stale   time.Duration     `name:"stale" help:"Maximum duration to serve stale cache when evaluation fails (e.g., 10m, 2h)"`
 	Dir     string            `arg:"" name:"dir" help:"Directory containing .jsonnet files to serve" type:"existingdir"`
 
 	// functions holds additional native functions to be added to the Jsonnet VM
 	functions []*jsonnet.NativeFunction `kong:"-"`
+
+	// cache holds the in-memory cache for evaluation results
+	cache cacheStore `kong:"-"`
 }
 
 // AddFunctions adds custom native functions to the server
@@ -51,6 +57,9 @@ func (s *ServeCmd) Run(ctx context.Context) error {
 // then shuts down gracefully.
 func (s *ServeCmd) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{Handler: s.Handler()}
+	if s.cache != nil {
+		go s.cleanCachePeriodically(ctx)
+	}
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- srv.Serve(ln)
@@ -72,7 +81,28 @@ func (s *ServeCmd) Serve(ctx context.Context, ln net.Listener) error {
 
 // Handler returns the HTTP handler of the server
 func (s *ServeCmd) Handler() http.Handler {
+	if s.Cache > 0 && s.cache == nil {
+		s.cache = newMemoryCache(s.Cache, s.Stale)
+	}
 	return http.HandlerFunc(s.handleRequest)
+}
+
+// cleanCachePeriodically removes completely expired cache entries until
+// ctx is cancelled.
+func (s *ServeCmd) cleanCachePeriodically(ctx context.Context) {
+	interval := max(s.Cache, s.Stale)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := s.cache.Clean(); err != nil {
+				slog.Warn("Failed to clean cache", "error", err.Error())
+			}
+		}
+	}
 }
 
 func (s *ServeCmd) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +134,29 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 		functions: s.functions,
 	}
 
+	var cacheKey, staleContent string
+	if s.cache != nil {
+		if content, err := os.ReadFile(filename); err != nil {
+			slog.Warn("Failed to read file for cache key", "error", err.Error(), "file", filename)
+		} else if key, err := generateCacheKey(cli, content); err != nil {
+			slog.Warn("Failed to generate cache key", "error", err.Error(), "file", filename)
+		} else {
+			cacheKey = key
+			// Cache-Control: no-cache bypasses both the fresh lookup and
+			// the stale fallback; the result of the forced re-evaluation
+			// still refreshes the cache entry.
+			if !requestsNoCache(r) {
+				if entry, ok := s.cache.getWithStale(key); ok {
+					if !entry.isStale {
+						w.Header().Set("Age", strconv.Itoa(int(entry.age.Seconds())))
+						return s.writeJSONResponse(w, entry.content, "HIT")
+					}
+					staleContent = entry.content
+				}
+			}
+		}
+	}
+
 	ectx := r.Context()
 	if s.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -122,19 +175,68 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 	select {
 	case res := <-resultCh:
 		if res.err != nil {
+			if staleContent != "" {
+				slog.Warn("Evaluation failed, using stale cache", "error", res.err.Error(), "file", filename)
+				return s.writeJSONResponse(w, staleContent, "STALE")
+			}
 			slog.Error("failed to evaluate", "file", filename, "error", res.err)
 			return writeJSONError(w, http.StatusInternalServerError, res.err.Error())
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, res.jsonStr)
-		return http.StatusOK
+		// Report MISS (and cacheability) only when the result was
+		// actually stored; if key generation failed, the response is not
+		// backed by the cache.
+		var cacheStatus string
+		if cacheKey != "" {
+			if err := s.cache.Set(cacheKey, res.jsonStr); err != nil {
+				slog.Warn("Failed to save cache", "error", err.Error(), "file", filename)
+			} else {
+				cacheStatus = "MISS"
+			}
+		}
+		return s.writeJSONResponse(w, res.jsonStr, cacheStatus)
 	case <-ectx.Done():
 		if ectx.Err() == context.DeadlineExceeded {
+			if staleContent != "" {
+				slog.Warn("Evaluation timed out, using stale cache", "timeout", s.Timeout, "file", filename)
+				return s.writeJSONResponse(w, staleContent, "STALE")
+			}
 			return writeJSONError(w, http.StatusGatewayTimeout, fmt.Sprintf("evaluation timed out after %v", s.Timeout))
 		}
 		return writeJSONError(w, http.StatusInternalServerError, ectx.Err().Error())
 	}
+}
+
+// requestsNoCache reports whether the request asks to bypass the cache
+// via the Cache-Control: no-cache header.
+func requestsNoCache(r *http.Request) bool {
+	for directive := range strings.SplitSeq(r.Header.Get("Cache-Control"), ",") {
+		if strings.EqualFold(strings.TrimSpace(directive), "no-cache") {
+			return true
+		}
+	}
+	return false
+}
+
+// writeJSONResponse writes a 200 JSON response. cacheStatus is set as the
+// X-Cache header when non-empty. Cacheable responses (HIT/MISS) declare
+// the server-side TTL via Cache-Control: max-age so that downstream
+// caches expire them no later than the server does; anything else
+// (cache disabled, or a stale fallback that is already expired) must not
+// be stored downstream at all.
+func (s *ServeCmd) writeJSONResponse(w http.ResponseWriter, body, cacheStatus string) int {
+	switch cacheStatus {
+	case "HIT", "MISS":
+		w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(s.Cache.Seconds())))
+	default:
+		w.Header().Set("Cache-Control", "no-store")
+	}
+	if cacheStatus != "" {
+		w.Header().Set("X-Cache", cacheStatus)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, body)
+	return http.StatusOK
 }
 
 // resolvePath maps a URL path to a .jsonnet file under s.Dir.
@@ -176,6 +278,7 @@ func (s *ServeCmd) mergeQueryVars(q url.Values) map[string]string {
 }
 
 func writeJSONError(w http.ResponseWriter, code int, msg string) int {
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
