@@ -366,6 +366,91 @@ func TestServerCacheStaleOnTimeout(t *testing.T) {
 	}
 }
 
+func getNoCache(t *testing.T, url string) (int, string, string) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, string(body), resp.Header.Get("X-Cache")
+}
+
+func TestServerCacheNoCacheRefresh(t *testing.T) {
+	s := &armed.ServeCmd{Dir: "testdata/server", Cache: time.Minute}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	_, body1, cache1 := getWithCacheStatus(t, ts.URL+"/uuid.jsonnet")
+	if cache1 != "MISS" {
+		t.Fatalf("first request: got X-Cache=%q, want MISS", cache1)
+	}
+
+	status, body2, cache2 := getNoCache(t, ts.URL+"/uuid.jsonnet")
+	if status != http.StatusOK || cache2 != "MISS" {
+		t.Errorf("no-cache request: got status=%d X-Cache=%q, want 200/MISS", status, cache2)
+	}
+	if body1 == body2 {
+		t.Errorf("no-cache request must be re-evaluated, got same body %q", body1)
+	}
+
+	// The forced re-evaluation must have refreshed the cache entry.
+	_, body3, cache3 := getWithCacheStatus(t, ts.URL+"/uuid.jsonnet")
+	if cache3 != "HIT" {
+		t.Errorf("after refresh: got X-Cache=%q, want HIT", cache3)
+	}
+	if body2 != body3 {
+		t.Errorf("cache entry was not refreshed: %q vs %q", body2, body3)
+	}
+}
+
+func TestServerCacheNoCacheSkipsStale(t *testing.T) {
+	dir := t.TempDir()
+	dataFile := filepath.Join(dir, "data.txt")
+	if err := os.WriteFile(dataFile, []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	jsonnetFile := filepath.Join(dir, "stale.jsonnet")
+	code := fmt.Sprintf("{ v: std.native('file_content')('%s') }", dataFile)
+	if err := os.WriteFile(jsonnetFile, []byte(code), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := &armed.ServeCmd{Dir: dir, Cache: time.Minute, Stale: time.Hour}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	if _, _, cache1 := getWithCacheStatus(t, ts.URL+"/stale.jsonnet"); cache1 != "MISS" {
+		t.Fatalf("first request: got X-Cache=%q, want MISS", cache1)
+	}
+
+	// Break evaluation while the cached entry is still fresh.
+	if err := os.Remove(dataFile); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without no-cache, the fresh entry is served.
+	if _, _, cache2 := getWithCacheStatus(t, ts.URL+"/stale.jsonnet"); cache2 != "HIT" {
+		t.Errorf("normal request: got X-Cache=%q, want HIT", cache2)
+	}
+
+	// With no-cache, the failed re-evaluation must not fall back to the
+	// cached entry even though it is well within the stale window.
+	status, body, _ := getNoCache(t, ts.URL+"/stale.jsonnet")
+	if status != http.StatusInternalServerError {
+		t.Errorf("no-cache request: got status=%d (body: %s), want 500", status, body)
+	}
+}
+
 func TestServerCacheQueryParams(t *testing.T) {
 	s := &armed.ServeCmd{Dir: "testdata/server", Cache: 5 * time.Second}
 	ts := httptest.NewServer(s.Handler())

@@ -139,11 +139,16 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 			slog.Warn("Failed to generate cache key", "error", err.Error(), "file", filename)
 		} else {
 			cacheKey = key
-			if cached, isStale, ok := s.cache.GetWithStale(key); ok {
-				if !isStale {
-					return writeJSONResponse(w, cached, "HIT")
+			// Cache-Control: no-cache bypasses both the fresh lookup and
+			// the stale fallback; the result of the forced re-evaluation
+			// still refreshes the cache entry.
+			if !requestsNoCache(r) {
+				if cached, isStale, ok := s.cache.GetWithStale(key); ok {
+					if !isStale {
+						return writeJSONResponse(w, cached, "HIT")
+					}
+					staleContent = cached
 				}
-				staleContent = cached
 			}
 		}
 	}
@@ -193,6 +198,17 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 		}
 		return writeJSONError(w, http.StatusInternalServerError, ectx.Err().Error())
 	}
+}
+
+// requestsNoCache reports whether the request asks to bypass the cache
+// via the Cache-Control: no-cache header.
+func requestsNoCache(r *http.Request) bool {
+	for directive := range strings.SplitSeq(r.Header.Get("Cache-Control"), ",") {
+		if strings.EqualFold(strings.TrimSpace(directive), "no-cache") {
+			return true
+		}
+	}
+	return false
 }
 
 // writeJSONResponse writes a 200 JSON response. cacheStatus is set as the

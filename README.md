@@ -350,6 +350,12 @@ $ jsonnet-armed serve --cache 5m --stale 10m ./api
 - Within the `--cache` duration, requests are served from memory without evaluation.
 - With `--stale`, if a re-evaluation fails — or times out with `--timeout` (the timeout fallback is specific to server mode) — a stale result up to that age is served with status 200 instead of an error.
 - The `X-Cache` response header reports `HIT`, `MISS`, or `STALE`.
+- Requests with a `Cache-Control: no-cache` header bypass the cache: the file is always re-evaluated (no stale fallback on failure), and the fresh result replaces the cached entry.
+
+  ```console
+  $ curl -H 'Cache-Control: no-cache' localhost:9898/foo.jsonnet
+  ```
+
 - The cache is per-process and lost on restart. Entries older than max(`--cache`, `--stale`) are removed periodically.
 
 #### Status Codes
