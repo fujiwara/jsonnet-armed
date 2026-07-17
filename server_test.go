@@ -321,6 +321,16 @@ func TestServerCacheStaleFallback(t *testing.T) {
 		t.Errorf("stale response %q should contain original value", body2)
 	}
 
+	// A stale response is already expired and must not be stored downstream.
+	resp, err := http.Get(ts.URL + "/stale.jsonnet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if cc := resp.Header.Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("STALE Cache-Control: got %q, want no-store", cc)
+	}
+
 	time.Sleep(2 * time.Second) // beyond stale
 	status, body3, _ := getWithCacheStatus(t, ts.URL+"/stale.jsonnet")
 	if status != http.StatusInternalServerError {
@@ -449,6 +459,67 @@ func TestServerCacheNoCacheSkipsStale(t *testing.T) {
 	if status != http.StatusInternalServerError {
 		t.Errorf("no-cache request: got status=%d (body: %s), want 500", status, body)
 	}
+}
+
+func TestServerCacheControlHeader(t *testing.T) {
+	t.Run("no-store when cache disabled", func(t *testing.T) {
+		s := &armed.ServeCmd{Dir: "testdata/server"}
+		ts := httptest.NewServer(s.Handler())
+		defer ts.Close()
+
+		resp, err := http.Get(ts.URL + "/static.jsonnet")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if cc := resp.Header.Get("Cache-Control"); cc != "no-store" {
+			t.Errorf("Cache-Control: got %q, want no-store", cc)
+		}
+	})
+
+	t.Run("max-age and Age when cache enabled", func(t *testing.T) {
+		s := &armed.ServeCmd{Dir: "testdata/server", Cache: time.Minute}
+		ts := httptest.NewServer(s.Handler())
+		defer ts.Close()
+
+		resp, err := http.Get(ts.URL + "/static.jsonnet")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if cc := resp.Header.Get("Cache-Control"); cc != "max-age=60" {
+			t.Errorf("MISS Cache-Control: got %q, want max-age=60", cc)
+		}
+
+		resp, err = http.Get(ts.URL + "/static.jsonnet")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if cc := resp.Header.Get("Cache-Control"); cc != "max-age=60" {
+			t.Errorf("HIT Cache-Control: got %q, want max-age=60", cc)
+		}
+		if age := resp.Header.Get("Age"); age != "0" {
+			t.Errorf("HIT Age: got %q, want 0", age)
+		}
+	})
+
+	t.Run("no-store on error responses", func(t *testing.T) {
+		s := &armed.ServeCmd{Dir: "testdata/server", Cache: time.Minute}
+		ts := httptest.NewServer(s.Handler())
+		defer ts.Close()
+
+		for _, path := range []string{"/missing.jsonnet", "/error.jsonnet"} {
+			resp, err := http.Get(ts.URL + path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if cc := resp.Header.Get("Cache-Control"); cc != "no-store" {
+				t.Errorf("%s Cache-Control: got %q, want no-store", path, cc)
+			}
+		}
+	})
 }
 
 func TestServerCacheQueryParams(t *testing.T) {

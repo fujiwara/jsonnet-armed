@@ -13,13 +13,19 @@ import (
 	"time"
 )
 
+// cacheEntry is the result of a cache lookup.
+type cacheEntry struct {
+	content string
+	age     time.Duration // time elapsed since the entry was stored
+	isStale bool          // beyond ttl but within staleTTL
+}
+
 // cacheStore is the common interface of evaluation result caches.
-// GetWithStale returns (content, isStale, exists): a fresh entry (within
-// ttl) is returned with isStale=false, an entry within staleTTL with
-// isStale=true, and a completely expired entry is removed and reported
-// as not existing.
+// getWithStale returns a fresh entry (within ttl) with isStale=false, an
+// entry within staleTTL with isStale=true, and removes a completely
+// expired entry, reporting it as not existing.
 type cacheStore interface {
-	GetWithStale(key string) (content string, isStale bool, exists bool)
+	getWithStale(key string) (entry cacheEntry, exists bool)
 	Set(key string, result string) error
 	Clean() error
 }
@@ -101,8 +107,13 @@ func (c *Cache) Get(key string) (string, bool) {
 // GetWithStale retrieves a cached result with stale status information
 // Returns (content, isStale, exists)
 func (c *Cache) GetWithStale(key string) (string, bool, bool) {
+	entry, exists := c.getWithStale(key)
+	return entry.content, entry.isStale, exists
+}
+
+func (c *Cache) getWithStale(key string) (cacheEntry, bool) {
 	if c.ttl == 0 {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	cachePath := filepath.Join(c.dir, key+".json")
@@ -110,7 +121,7 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 	// Check file stats first
 	stat, err := os.Stat(cachePath)
 	if err != nil {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	age := time.Since(stat.ModTime())
@@ -123,9 +134,9 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 				"error", err.Error(),
 				"cache_path", cachePath,
 				"cache_key", key[:8]+"...")
-			return "", false, false
+			return cacheEntry{}, false
 		}
-		return string(data), false, true
+		return cacheEntry{content: string(data), age: age}, true
 	}
 
 	// Check stale cache (within staleTTL)
@@ -136,9 +147,9 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 				"error", err.Error(),
 				"cache_path", cachePath,
 				"cache_key", key[:8]+"...")
-			return "", false, false
+			return cacheEntry{}, false
 		}
-		return string(data), true, true
+		return cacheEntry{content: string(data), age: age, isStale: true}, true
 	}
 
 	// Completely expired - remove it
@@ -148,7 +159,7 @@ func (c *Cache) GetWithStale(key string) (string, bool, bool) {
 			"cache_path", cachePath,
 			"cache_key", key[:8]+"...")
 	}
-	return "", false, false
+	return cacheEntry{}, false
 }
 
 // Set stores a result in the cache
@@ -193,12 +204,11 @@ func newMemoryCache(ttl, staleTTL time.Duration) *memoryCache {
 	}
 }
 
-// GetWithStale retrieves a cached result with stale status information.
-// Returns (content, isStale, exists). Completely expired entries are
-// removed on access.
-func (c *memoryCache) GetWithStale(key string) (string, bool, bool) {
+// getWithStale retrieves a cached result with stale status information.
+// Completely expired entries are removed on access.
+func (c *memoryCache) getWithStale(key string) (cacheEntry, bool) {
 	if c.ttl == 0 {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	c.mu.Lock()
@@ -206,20 +216,20 @@ func (c *memoryCache) GetWithStale(key string) (string, bool, bool) {
 
 	entry, ok := c.entries[key]
 	if !ok {
-		return "", false, false
+		return cacheEntry{}, false
 	}
 
 	age := time.Since(entry.storedAt)
 	if age <= c.ttl {
-		return entry.content, false, true
+		return cacheEntry{content: entry.content, age: age}, true
 	}
 	if c.staleTTL > 0 && age <= c.staleTTL {
-		return entry.content, true, true
+		return cacheEntry{content: entry.content, age: age, isStale: true}, true
 	}
 
 	// Completely expired - remove it
 	delete(c.entries, key)
-	return "", false, false
+	return cacheEntry{}, false
 }
 
 // Set stores a result in the cache

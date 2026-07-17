@@ -132,15 +132,20 @@ func TestCacheStoreGetWithStale(t *testing.T) {
 					h.seed(t, s, "key", "result", tt.age)
 				}
 
-				content, isStale, exists := s.GetWithStale("key")
+				entry, exists := s.getWithStale("key")
 				if exists != tt.wantExists {
 					t.Errorf("exists: got %v, want %v", exists, tt.wantExists)
 				}
-				if isStale != tt.wantStale {
-					t.Errorf("isStale: got %v, want %v", isStale, tt.wantStale)
+				if entry.isStale != tt.wantStale {
+					t.Errorf("isStale: got %v, want %v", entry.isStale, tt.wantStale)
 				}
-				if content != tt.wantContent {
-					t.Errorf("content: got %q, want %q", content, tt.wantContent)
+				if entry.content != tt.wantContent {
+					t.Errorf("content: got %q, want %q", entry.content, tt.wantContent)
+				}
+				if tt.wantExists {
+					if entry.age < tt.age || entry.age > tt.age+10*time.Second {
+						t.Errorf("age: got %v, want around %v", entry.age, tt.age)
+					}
 				}
 				if tt.age >= 0 {
 					if kept := h.exists(t, s, "key"); kept != tt.wantKept {
@@ -159,14 +164,14 @@ func TestCacheStoreSet(t *testing.T) {
 			if err := s.Set("key", "v1"); err != nil {
 				t.Fatal(err)
 			}
-			if content, _, exists := s.GetWithStale("key"); !exists || content != "v1" {
-				t.Errorf("got (%q, %v), want (v1, true)", content, exists)
+			if entry, exists := s.getWithStale("key"); !exists || entry.content != "v1" {
+				t.Errorf("got (%q, %v), want (v1, true)", entry.content, exists)
 			}
 			if err := s.Set("key", "v2"); err != nil {
 				t.Fatal(err)
 			}
-			if content, _, exists := s.GetWithStale("key"); !exists || content != "v2" {
-				t.Errorf("got (%q, %v), want (v2, true)", content, exists)
+			if entry, exists := s.getWithStale("key"); !exists || entry.content != "v2" {
+				t.Errorf("got (%q, %v), want (v2, true)", entry.content, exists)
 			}
 		})
 
@@ -266,7 +271,7 @@ func TestMemoryCacheConcurrent(t *testing.T) {
 			key := fmt.Sprintf("key%d", i%3)
 			for range 100 {
 				c.Set(key, "result")
-				c.GetWithStale(key)
+				c.getWithStale(key)
 				c.Clean()
 			}
 		}()

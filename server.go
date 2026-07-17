@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -143,11 +144,12 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 			// the stale fallback; the result of the forced re-evaluation
 			// still refreshes the cache entry.
 			if !requestsNoCache(r) {
-				if cached, isStale, ok := s.cache.GetWithStale(key); ok {
-					if !isStale {
-						return writeJSONResponse(w, cached, "HIT")
+				if entry, ok := s.cache.getWithStale(key); ok {
+					if !entry.isStale {
+						w.Header().Set("Age", strconv.Itoa(int(entry.age.Seconds())))
+						return s.writeJSONResponse(w, entry.content, "HIT")
 					}
-					staleContent = cached
+					staleContent = entry.content
 				}
 			}
 		}
@@ -173,7 +175,7 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 		if res.err != nil {
 			if staleContent != "" {
 				slog.Warn("Evaluation failed, using stale cache", "error", res.err.Error(), "file", filename)
-				return writeJSONResponse(w, staleContent, "STALE")
+				return s.writeJSONResponse(w, staleContent, "STALE")
 			}
 			slog.Error("failed to evaluate", "file", filename, "error", res.err)
 			return writeJSONError(w, http.StatusInternalServerError, res.err.Error())
@@ -187,12 +189,12 @@ func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) in
 		if s.cache != nil {
 			cacheStatus = "MISS"
 		}
-		return writeJSONResponse(w, res.jsonStr, cacheStatus)
+		return s.writeJSONResponse(w, res.jsonStr, cacheStatus)
 	case <-ectx.Done():
 		if ectx.Err() == context.DeadlineExceeded {
 			if staleContent != "" {
 				slog.Warn("Evaluation timed out, using stale cache", "timeout", s.Timeout, "file", filename)
-				return writeJSONResponse(w, staleContent, "STALE")
+				return s.writeJSONResponse(w, staleContent, "STALE")
 			}
 			return writeJSONError(w, http.StatusGatewayTimeout, fmt.Sprintf("evaluation timed out after %v", s.Timeout))
 		}
@@ -212,8 +214,18 @@ func requestsNoCache(r *http.Request) bool {
 }
 
 // writeJSONResponse writes a 200 JSON response. cacheStatus is set as the
-// X-Cache header when non-empty.
-func writeJSONResponse(w http.ResponseWriter, body, cacheStatus string) int {
+// X-Cache header when non-empty. Cacheable responses (HIT/MISS) declare
+// the server-side TTL via Cache-Control: max-age so that downstream
+// caches expire them no later than the server does; anything else
+// (cache disabled, or a stale fallback that is already expired) must not
+// be stored downstream at all.
+func (s *ServeCmd) writeJSONResponse(w http.ResponseWriter, body, cacheStatus string) int {
+	switch cacheStatus {
+	case "HIT", "MISS":
+		w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(s.Cache.Seconds())))
+	default:
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	if cacheStatus != "" {
 		w.Header().Set("X-Cache", cacheStatus)
 	}
@@ -262,6 +274,7 @@ func (s *ServeCmd) mergeQueryVars(q url.Values) map[string]string {
 }
 
 func writeJSONError(w http.ResponseWriter, code int, msg string) int {
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})

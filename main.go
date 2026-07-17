@@ -157,10 +157,10 @@ func (cli *CLI) processRequest(ctx context.Context, cache cacheStore) result {
 				"error", err.Error(),
 				"filename", cli.Filename)
 		} else {
-			if cachedResult, isStale, exists := cache.GetWithStale(cacheKey); exists {
-				if !isStale {
+			if entry, exists := cache.getWithStale(cacheKey); exists {
+				if !entry.isStale {
 					// Use fresh cached result
-					formatted, fErr := cli.formatOutput(cachedResult)
+					formatted, fErr := cli.formatOutput(entry.content)
 					if fErr != nil {
 						return result{jsonStr: "", err: fErr}
 					}
@@ -168,7 +168,7 @@ func (cli *CLI) processRequest(ctx context.Context, cache cacheStore) result {
 					return result{jsonStr: formatted, err: err}
 				}
 				// Store stale content for potential fallback
-				staleContent = cachedResult
+				staleContent = entry.content
 			}
 			// Store cache key for later use
 			cli.cacheKey = cacheKey
