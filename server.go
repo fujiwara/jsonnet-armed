@@ -25,12 +25,13 @@ const serverShutdownTimeout = 5 * time.Second
 // ServeCmd runs an HTTP server that evaluates jsonnet files under Dir
 // and returns the results as JSON.
 type ServeCmd struct {
-	Listen  string            `name:"listen" default:"localhost:9898" help:"Listen address (host:port)"`
-	Timeout time.Duration     `short:"t" name:"timeout" help:"Timeout for each request's evaluation (e.g., 30s, 5m)"`
-	ExtStr  map[string]string `short:"V" name:"ext-str" help:"Default external string variables (overridden by query parameters)"`
-	Cache   time.Duration     `name:"cache" help:"Cache evaluation results in memory for specified duration (e.g., 5m, 1h)"`
-	Stale   time.Duration     `name:"stale" help:"Maximum duration to serve stale cache when evaluation fails (e.g., 10m, 2h)"`
-	Dir     string            `arg:"" name:"dir" help:"Directory containing .jsonnet files to serve" type:"existingdir"`
+	Listen    string            `name:"listen" default:"localhost:9898" help:"Listen address (host:port)"`
+	Timeout   time.Duration     `short:"t" name:"timeout" help:"Timeout for each request's evaluation (e.g., 30s, 5m)"`
+	ExtStr    map[string]string `short:"V" name:"ext-str" help:"Default external string variables (overridden by query parameters)"`
+	Cache     time.Duration     `name:"cache" help:"Cache evaluation results in memory for specified duration (e.g., 5m, 1h)"`
+	Stale     time.Duration     `name:"stale" help:"Maximum duration to serve stale cache when evaluation fails (e.g., 10m, 2h)"`
+	LogFormat string            `name:"log-format" default:"text" enum:"text,json" help:"Log format (text or json)"`
+	Dir       string            `arg:"" name:"dir" help:"Directory containing .jsonnet files to serve" type:"existingdir"`
 
 	// functions holds additional native functions to be added to the Jsonnet VM
 	functions []*jsonnet.NativeFunction `kong:"-"`
@@ -46,6 +47,9 @@ func (s *ServeCmd) AddFunctions(funcs ...*jsonnet.NativeFunction) {
 
 // Run listens on s.Listen and serves HTTP until ctx is cancelled
 func (s *ServeCmd) Run(ctx context.Context) error {
+	if s.LogFormat == "json" {
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+	}
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.Listen, err)
@@ -67,12 +71,15 @@ func (s *ServeCmd) Serve(ctx context.Context, ln net.Listener) error {
 	slog.Info("jsonnet-armed server starting", "addr", ln.Addr().String(), "dir", s.Dir)
 	select {
 	case <-ctx.Done():
+		slog.Info("shutting down server")
 		sctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 		defer cancel()
 		if err := srv.Shutdown(sctx); err != nil {
+			slog.Warn("graceful shutdown failed, closing server", "error", err.Error())
 			srv.Close()
 			return err
 		}
+		slog.Info("server stopped")
 		return nil
 	case err := <-errCh:
 		return err
@@ -108,13 +115,17 @@ func (s *ServeCmd) cleanCachePeriodically(ctx context.Context) {
 func (s *ServeCmd) handleRequest(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	status := s.processHTTPRequest(w, r)
-	slog.Info("request",
+	attrs := []any{
 		"method", r.Method,
 		"path", r.URL.Path,
 		"status", status,
 		"duration", time.Since(start),
 		"remote", r.RemoteAddr,
-	)
+	}
+	if cache := w.Header().Get("X-Cache"); cache != "" {
+		attrs = append(attrs, "cache", cache)
+	}
+	slog.Info("request", attrs...)
 }
 
 func (s *ServeCmd) processHTTPRequest(w http.ResponseWriter, r *http.Request) int {
