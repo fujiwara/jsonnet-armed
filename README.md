@@ -300,7 +300,7 @@ local exec_with_env = std.native("exec_with_env");
 jsonnet-armed can run as an HTTP server that evaluates jsonnet files on demand. This is useful for building a small API server: the daemon holds credentials (environment variables, cloud credentials, etc.) and evaluates jsonnet files that call native functions (`exec`, `http_get`, DNS lookups, ...), while clients simply GET the results without needing any credentials.
 
 ```console
-$ jsonnet-armed serve [--listen localhost:9898] [--timeout 30s] [-V key=value] <dir>
+$ jsonnet-armed serve [--listen localhost:9898] [--timeout 30s] [-V key=value] [--cache 5m] [--stale 10m] <dir>
 ```
 
 The request path maps directly to a `.jsonnet` file under `<dir>`:
@@ -338,11 +338,25 @@ $ curl 'localhost:9898/limit.jsonnet?limit=10'
 }
 ```
 
+#### Caching
+
+`--cache` enables an in-memory cache of evaluation results (this is separate from the file-based cache of the eval mode — see [Cache Feature](#cache-feature) for the shared semantics):
+
+```console
+$ jsonnet-armed serve --cache 5m --stale 10m ./api
+```
+
+- Results are cached per unique combination of file path, file content, and query parameters. Editing a jsonnet file invalidates its entries immediately.
+- Within the `--cache` duration, requests are served from memory without evaluation.
+- With `--stale`, if a re-evaluation fails — or times out with `--timeout` (the timeout fallback is specific to server mode) — a stale result up to that age is served with status 200 instead of an error.
+- The `X-Cache` response header reports `HIT`, `MISS`, or `STALE`.
+- The cache is per-process and lost on restart. Entries older than max(`--cache`, `--stale`) are removed periodically.
+
 #### Status Codes
 
 | Status | Condition |
 |--------|-----------|
-| 200 | Evaluation succeeded |
+| 200 | Evaluation succeeded (or a cached/stale result was served) |
 | 404 | File not found, non-`.jsonnet` path, or path traversal attempt |
 | 405 | Method other than GET |
 | 500 | Evaluation error (body: `{"error": "..."}` including the jsonnet error message) |
@@ -353,6 +367,7 @@ $ curl 'localhost:9898/limit.jsonnet?limit=10'
 - The server binds to `localhost` by default. **Server mode assumes trusted clients.** The served jsonnet files can execute commands and access credentials on the server, and clients control their inputs via query parameters — never expose the server beyond localhost or a trusted network without an authenticating proxy.
 - Query parameters are passed only as external *string* variables; clients cannot inject jsonnet code.
 - Error responses include jsonnet error details (file paths, expressions) to aid debugging.
+- With `--cache`, each unique query-parameter combination creates a cache entry that lives up to max(`--cache`, `--stale`); clients that vary parameters freely grow the cache accordingly.
 
 The server shuts down gracefully on SIGINT/SIGTERM, allowing in-flight evaluations to complete (up to 5 seconds).
 
