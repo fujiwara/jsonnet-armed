@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/miekg/dns v1.1.72
-	golang.org/x/sys v0.43.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
